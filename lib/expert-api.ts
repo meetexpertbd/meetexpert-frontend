@@ -259,7 +259,12 @@ export function parseSlotPrice(
     const n = Number(raw)
     return Number.isFinite(n) ? n : null
   }
-  const value = raw.slot_price ?? raw.price
+  const value =
+    "slot_price" in raw && raw.slot_price != null && raw.slot_price !== ""
+      ? raw.slot_price
+      : "price" in raw
+        ? raw.price
+        : undefined
   if (value == null || value === "") return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
