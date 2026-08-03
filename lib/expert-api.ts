@@ -151,3 +151,134 @@ export async function updateExpertApplication(token: string, input: Partial<Expe
     { token }
   )
 }
+
+export const EXPERT_AVAILABILITY_URL = "/expert/availability"
+
+export type AvailabilitySlot = {
+  id?: number
+  start: string
+  end: string
+}
+
+export type AvailabilityDay = {
+  day_of_week: number
+  enabled: boolean
+  slots: AvailabilitySlot[]
+}
+
+export type ExpertAvailability = {
+  days: AvailabilityDay[]
+}
+
+export type ExpertAvailabilityInput = {
+  days: Array<{
+    day_of_week: number
+    enabled: boolean
+    slots?: Array<{ start: string; end: string }> | null
+  }>
+}
+
+function normalizeTime(value: string): string {
+  if (!value) return "09:00"
+  const m = value.match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return value
+  return `${m[1].padStart(2, "0")}:${m[2]}`
+}
+
+export function emptyAvailabilityDays(): AvailabilityDay[] {
+  return Array.from({ length: 7 }, (_, day_of_week) => ({
+    day_of_week,
+    enabled: false,
+    slots: [],
+  }))
+}
+
+export function normalizeAvailabilityDays(
+  raw: ExpertAvailability | AvailabilityDay[] | null | undefined
+): AvailabilityDay[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.days)
+      ? raw.days
+      : []
+
+  const byDay = new Map<number, AvailabilityDay>()
+  for (const day of list) {
+    const dayOfWeek = Number(day.day_of_week)
+    if (Number.isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) continue
+    byDay.set(dayOfWeek, {
+      day_of_week: dayOfWeek,
+      enabled: Boolean(day.enabled),
+      slots: (day.slots ?? []).map((slot) => ({
+        id: slot.id,
+        start: normalizeTime(slot.start),
+        end: normalizeTime(slot.end),
+      })),
+    })
+  }
+
+  return emptyAvailabilityDays().map(
+    (fallback) => byDay.get(fallback.day_of_week) ?? fallback
+  )
+}
+
+export async function fetchExpertAvailability(token: string) {
+  return get<ApiEnvelope<ExpertAvailability | AvailabilityDay[]>>(
+    EXPERT_AVAILABILITY_URL,
+    { token }
+  )
+}
+
+export async function saveExpertAvailability(
+  token: string,
+  input: ExpertAvailabilityInput
+) {
+  return put<ApiEnvelope<ExpertAvailability | AvailabilityDay[]>>(
+    EXPERT_AVAILABILITY_URL,
+    input,
+    { token }
+  )
+}
+
+export const EXPERT_SLOT_PRICE_URL = "/expert/slot-price"
+
+export type ExpertSlotPrice = {
+  slot_price: number
+}
+
+export type ExpertSlotPriceInput = {
+  slot_price: number
+}
+
+export function parseSlotPrice(
+  raw: ExpertSlotPrice | { price?: number | string | null; slot_price?: number | string | null } | number | string | null | undefined
+): number | null {
+  if (raw == null) return null
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null
+  if (typeof raw === "string") {
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  }
+  const value = raw.slot_price ?? raw.price
+  if (value == null || value === "") return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+export async function fetchExpertSlotPrice(token: string) {
+  return get<ApiEnvelope<ExpertSlotPrice | { price?: number } | number>>(
+    EXPERT_SLOT_PRICE_URL,
+    { token }
+  )
+}
+
+export async function saveExpertSlotPrice(
+  token: string,
+  input: ExpertSlotPriceInput
+) {
+  return put<ApiEnvelope<ExpertSlotPrice | { price?: number } | number>>(
+    EXPERT_SLOT_PRICE_URL,
+    input,
+    { token }
+  )
+}
