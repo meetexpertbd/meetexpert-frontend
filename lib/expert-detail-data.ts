@@ -1,5 +1,13 @@
-import { fetchExpertById } from "@/lib/expert-api"
-import type { EducationEntry, ExperienceEntry, ExpertEntity, PortfolioEntry } from "@/lib/expert-api"
+import {
+  fetchExpertById,
+  normalizeAvailabilityDays,
+  parseSlotPrice,
+  type AvailabilityDay,
+  type EducationEntry,
+  type ExperienceEntry,
+  type ExpertDetailEntity,
+  type PortfolioEntry,
+} from "@/lib/expert-api"
 import { PLACEHOLDER_AVATAR, type ExpertItem, mapExpertToItem } from "./experts-data"
 
 export type EducationItem = {
@@ -51,6 +59,8 @@ export type ExpertDetail = ExpertItem & {
   sessions: number
   duration: string | null
   price: string | null
+  slotPrice: number | null
+  availability: AvailabilityDay[]
 }
 
 function asArray<T>(value: unknown): T[] {
@@ -119,13 +129,43 @@ function mapPortfolio(items: unknown): PortfolioItem[] {
   }))
 }
 
-export function mapExpertToDetail(expert: ExpertEntity): ExpertDetail {
+function slotDurationMinutes(days: AvailabilityDay[]): number | null {
+  for (const day of days) {
+    if (!day.enabled) continue
+    for (const slot of day.slots) {
+      const [sh, sm] = slot.start.split(":").map(Number)
+      const [eh, em] = slot.end.split(":").map(Number)
+      if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) continue
+      const mins = eh * 60 + em - (sh * 60 + sm)
+      if (mins > 0) return mins
+    }
+  }
+  return null
+}
+
+function formatPrice(value: number | null): string | null {
+  if (value == null || !Number.isFinite(value)) return null
+  return `${value.toLocaleString("en-BD")} BDT`
+}
+
+function formatDuration(minutes: number | null): string | null {
+  if (minutes == null || minutes <= 0) return null
+  if (minutes < 60) return `${minutes} min`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m ? `${h}h ${m}m` : `${h}h`
+}
+
+export function mapExpertToDetail(expert: ExpertDetailEntity): ExpertDetail {
   const base = mapExpertToItem(expert)
   const education = mapEducation(expert.education)
   const workExperience = mapExperience(expert.experience)
   const portfolio = mapPortfolio(expert.portfolio)
   const expertise = asArray<{ name: string }>(expert.skills).map((s) => s.name)
   const languages = asArray<string>(expert.languages)
+  const availability = normalizeAvailabilityDays(expert.days)
+  const slotPrice = parseSlotPrice(expert.slot_price)
+  const durationMins = slotDurationMinutes(availability)
 
   const degreesLine = education
     .map((e) => [e.degree, e.institution].filter(Boolean).join(", "))
@@ -146,7 +186,7 @@ export function mapExpertToDetail(expert: ExpertEntity): ExpertDetail {
     languages,
     education,
     expertise,
-    demoVideoEmbedUrl: youtubeEmbedUrl(expert.intro_video_url),
+    demoVideoEmbedUrl: youtubeEmbedUrl(expert.intro_video_url ?? expert.intro_video),
     reviews: [],
     responseTime: null,
     joinedYear: null,
@@ -159,8 +199,10 @@ export function mapExpertToDetail(expert: ExpertEntity): ExpertDetail {
     portfolio,
     rating: 0,
     sessions: 0,
-    duration: null,
-    price: null,
+    duration: formatDuration(durationMins),
+    price: formatPrice(slotPrice),
+    slotPrice,
+    availability,
   }
 }
 

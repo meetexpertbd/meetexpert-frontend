@@ -40,6 +40,7 @@ export type ExpertEntity = {
   bio: string
   years_of_experience: number
   registration_value: string
+  slot_price?: number | null
   intro_video: string | null
   intro_video_url: string | null
   languages: string[]
@@ -85,7 +86,16 @@ export async function fetchExperts(params?: ExpertsListParams) {
 }
 
 export async function fetchExpertById(id: number | string) {
-  return get<ApiEnvelope<ExpertEntity>>(`${EXPERTS_API_URL}/${id}`)
+  return get<ApiEnvelope<ExpertDetailEntity>>(`${EXPERTS_API_URL}/${id}`)
+}
+
+export async function fetchExpertAvailableSlots(
+  userId: number | string,
+  date: string
+) {
+  return get<ApiEnvelope<ExpertAvailableSlotsData>>(
+    `${EXPERTS_API_URL}/${userId}/available-slots?date=${encodeURIComponent(date)}`
+  )
 }
 
 export type ExpertApplication = {
@@ -168,6 +178,24 @@ export type AvailabilityDay = {
 
 export type ExpertAvailability = {
   days: AvailabilityDay[]
+}
+
+export type ExpertDetailEntity = ExpertEntity & {
+  days?: AvailabilityDay[]
+}
+
+export type ExpertAvailableSlot = {
+  id: number
+  day_of_week: number
+  start: string
+  end: string
+  slot_price: number | null
+  is_booked: boolean
+}
+
+export type ExpertAvailableSlotsData = {
+  date: string
+  slots: ExpertAvailableSlot[]
 }
 
 export type ExpertAvailabilityInput = {
