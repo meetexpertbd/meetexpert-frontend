@@ -6,6 +6,8 @@ import {
   Calendar,
   Clock,
   Loader2,
+  Mail,
+  Phone,
   RefreshCw,
   User,
   Video,
@@ -15,6 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { resolveAvatarUrl } from "@/lib/auth-api"
 import {
+  fetchExpertBookings,
   fetchUserBookings,
   type BookingEntity,
 } from "@/lib/expert-api"
@@ -85,7 +88,7 @@ function BookingAvatar({
   }, [url])
 
   return (
-    <div className="relative mx-auto flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted sm:mx-0">
+    <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
       {url && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -101,20 +104,42 @@ function BookingAvatar({
   )
 }
 
-function BookingCard({ booking }: { booking: BookingEntity }) {
+function UserBookingCard({ booking }: { booking: BookingEntity }) {
   const expert = booking.expert
   const price = formatPrice(expert?.slot_price)
+  const expertHref = expert?.id != null ? `/experts/${expert.id}` : null
 
   return (
     <Card className="border-border">
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
-        <BookingAvatar src={expert?.avatar_url} name={expert?.name ?? "Expert"} />
+        {expertHref ? (
+          <Link
+            href={expertHref}
+            className="mx-auto block shrink-0 transition-opacity hover:opacity-90 sm:mx-0"
+            aria-label={`View ${expert?.name ?? "expert"} profile`}
+          >
+            <BookingAvatar src={expert?.avatar_url} name={expert?.name ?? "Expert"} />
+          </Link>
+        ) : (
+          <div className="mx-auto sm:mx-0">
+            <BookingAvatar src={expert?.avatar_url} name={expert?.name ?? "Expert"} />
+          </div>
+        )}
 
         <div className="min-w-0 flex-1 text-center sm:text-left">
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-            <h2 className="truncate text-base font-semibold text-foreground">
-              {expert?.name ?? "Expert"}
-            </h2>
+            {expertHref ? (
+              <Link
+                href={expertHref}
+                className="truncate text-base font-semibold text-foreground hover:text-primary hover:underline"
+              >
+                {expert?.name ?? "Expert"}
+              </Link>
+            ) : (
+              <h2 className="truncate text-base font-semibold text-foreground">
+                {expert?.name ?? "Expert"}
+              </h2>
+            )}
             <StatusBadge status={booking.status} />
           </div>
           {expert?.professional_headline && (
@@ -140,11 +165,11 @@ function BookingCard({ booking }: { booking: BookingEntity }) {
           )}
         </div>
 
-        {expert?.id != null && (
+        {expertHref && (
           <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
-            <Link href={`/experts/${expert.id}`}>
+            <Link href={expertHref}>
               <Video className="size-4" />
-              View expert
+              Join
             </Link>
           </Button>
         )}
@@ -153,8 +178,68 @@ function BookingCard({ booking }: { booking: BookingEntity }) {
   )
 }
 
+function ExpertBookingCard({ booking }: { booking: BookingEntity }) {
+  const client = booking.user
+
+  return (
+    <Card className="border-border">
+      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+        <div className="mx-auto sm:mx-0">
+          <BookingAvatar src={client?.avatar_url} name={client?.name ?? "Client"} />
+        </div>
+
+        <div className="min-w-0 flex-1 text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            <h2 className="truncate text-base font-semibold text-foreground">
+              {client?.name ?? "Client"}
+            </h2>
+            <StatusBadge status={booking.status} />
+          </div>
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground sm:justify-start">
+            {client?.email && (
+              <span className="inline-flex items-center gap-1.5">
+                <Mail className="size-3.5 text-primary" />
+                {client.email}
+              </span>
+            )}
+            {client?.phone && (
+              <span className="inline-flex items-center gap-1.5">
+                <Phone className="size-3.5 text-primary" />
+                {client.phone}
+              </span>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground sm:justify-start">
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar className="size-3.5 text-primary" />
+              {formatDate(booking.scheduled_date)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="size-3.5 text-primary" />
+              {formatTime(booking.start_time)} – {formatTime(booking.end_time)}
+            </span>
+          </div>
+          {booking.notes && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Note: {booking.notes}
+            </p>
+          )}
+        </div>
+
+        <Button variant="outline" size="sm" className="shrink-0 gap-1.5" type="button">
+          <Video className="size-4" />
+          Join
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function BookingsPage() {
   const token = useAuthStore((s) => s.token)
+  const authUser = useAuthStore((s) => s.user)
+  const isExpert = authUser?.user_type === "expert"
+
   const [filter, setFilter] = React.useState<StatusFilter>("all")
   const [bookings, setBookings] = React.useState<BookingEntity[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -172,10 +257,13 @@ export default function BookingsPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetchUserBookings(token, {
+      const params = {
         status: filter === "all" ? undefined : filter,
         per_page: 50,
-      })
+      } as const
+      const res = isExpert
+        ? await fetchExpertBookings(token, params)
+        : await fetchUserBookings(token, params)
       setBookings(res.data.data)
       setTotal(res.data.meta?.total ?? res.data.data.length)
     } catch (e) {
@@ -185,7 +273,7 @@ export default function BookingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [token, filter])
+  }, [token, filter, isExpert])
 
   React.useEffect(() => {
     void load()
@@ -203,7 +291,9 @@ export default function BookingsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Bookings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your booked consultation slots
+            {isExpert
+              ? "Sessions booked with you"
+              : "Your booked consultation slots"}
             {!loading && total > 0 ? ` · ${total}` : ""}
           </p>
         </div>
@@ -261,19 +351,27 @@ export default function BookingsPage() {
             <Calendar className="size-12" />
             <p className="mt-4 text-sm">
               {filter === "all"
-                ? "You haven’t booked any sessions yet."
+                ? isExpert
+                  ? "No clients have booked sessions with you yet."
+                  : "You haven’t booked any sessions yet."
                 : `No ${filter} bookings found.`}
             </p>
-            <Button className="mt-4" asChild>
-              <Link href="/experts">Browse experts</Link>
-            </Button>
+            {!isExpert && (
+              <Button className="mt-4" asChild>
+                <Link href="/experts">Browse experts</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} />
-          ))}
+          {bookings.map((booking) =>
+            isExpert ? (
+              <ExpertBookingCard key={booking.id} booking={booking} />
+            ) : (
+              <UserBookingCard key={booking.id} booking={booking} />
+            )
+          )}
         </div>
       )}
     </div>

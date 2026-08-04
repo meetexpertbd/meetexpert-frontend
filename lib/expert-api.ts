@@ -100,6 +100,7 @@ export async function fetchExpertAvailableSlots(
 
 export const BOOKINGS_API_URL = "/bookings"
 export const USER_BOOKINGS_API_URL = "/user/bookings"
+export const EXPERT_BOOKINGS_API_URL = "/expert/bookings"
 
 export type CreateBookingInput = {
   expert_id: number
@@ -116,6 +117,14 @@ export type BookingExpert = {
   slot_price?: number | null
 }
 
+export type BookingUser = {
+  id: number
+  name: string
+  email?: string | null
+  phone?: string | null
+  avatar_url?: string | null
+}
+
 export type BookingEntity = {
   id: number
   status: string
@@ -125,7 +134,7 @@ export type BookingEntity = {
   notes: string | null
   availability_slot_id: number
   expert?: BookingExpert | null
-  user?: { id: number; name: string } | null
+  user?: BookingUser | null
   meeting?: unknown
   created_at?: string
   updated_at?: string
@@ -180,6 +189,20 @@ export async function fetchUserBookings(
 ) {
   const res = await get<ApiEnvelope<BookingEntity[] | PaginatedBookings>>(
     `${USER_BOOKINGS_API_URL}${bookingsQuery(params)}`,
+    { token }
+  )
+  return {
+    ...res,
+    data: normalizeBookingsPayload(res.data),
+  }
+}
+
+export async function fetchExpertBookings(
+  token: string,
+  params?: UserBookingsParams
+) {
+  const res = await get<ApiEnvelope<BookingEntity[] | PaginatedBookings>>(
+    `${EXPERT_BOOKINGS_API_URL}${bookingsQuery(params)}`,
     { token }
   )
   return {
