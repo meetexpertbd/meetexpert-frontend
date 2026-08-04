@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,8 +22,15 @@ import { useAuthStore } from "@/store/auth-store"
 
 type Step = "email" | "password" | "forgot-otp" | "forgot-reset"
 
-export default function LoginPage() {
+function safeRedirectPath(raw: string | null): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null
+  return raw
+}
+
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = safeRedirectPath(searchParams.get("redirect")) ?? "/dashboard"
   const token = useAuthStore((s) => s.token)
   const isHydrated = useAuthStore((s) => s.isHydrated)
   const email = useAuthStore((s) => s.email)
@@ -42,8 +49,8 @@ export default function LoginPage() {
   const [resendCooldown, setResendCooldown] = React.useState(0)
 
   React.useEffect(() => {
-    if (isHydrated && token) router.replace("/dashboard")
-  }, [isHydrated, token, router])
+    if (isHydrated && token) router.replace(redirectTo)
+  }, [isHydrated, token, router, redirectTo])
 
   React.useEffect(() => {
     if (!resendCooldown) return
@@ -74,7 +81,8 @@ export default function LoginPage() {
       const action = res.data?.action
       setEmail(nextEmail)
       if (action === "register") {
-        router.push("/login/verify")
+        const q = redirectTo !== "/dashboard" ? `?redirect=${encodeURIComponent(redirectTo)}` : ""
+        router.push(`/login/verify${q}`)
         return
       }
       if (action === "login") {
@@ -98,7 +106,7 @@ export default function LoginPage() {
       const res = await loginWithPassword(email, password)
       if (!res.token) throw new Error(res.message || "No token returned")
       setAuth(res.token, res.user)
-      router.replace("/dashboard")
+      router.replace(redirectTo)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong")
     } finally {
@@ -432,5 +440,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <LoginPageContent />
+    </React.Suspense>
   )
 }

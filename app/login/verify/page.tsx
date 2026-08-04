@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,8 +17,15 @@ import {
 } from "@/lib/auth-api"
 import { useAuthStore } from "@/store/auth-store"
 
+function safeRedirectPath(raw: string | null): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return null
+  return raw
+}
+
 function VerifyPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = safeRedirectPath(searchParams.get("redirect")) ?? "/dashboard"
   const token = useAuthStore((s) => s.token)
   const isHydrated = useAuthStore((s) => s.isHydrated)
   const email = useAuthStore((s) => s.email)
@@ -37,13 +44,14 @@ function VerifyPageContent() {
 
   React.useEffect(() => {
     if (isHydrated && token) {
-      router.replace("/dashboard")
+      router.replace(redirectTo)
       return
     }
     if (isHydrated && !email) {
-      router.replace("/login")
+      const q = redirectTo !== "/dashboard" ? `?redirect=${encodeURIComponent(redirectTo)}` : ""
+      router.replace(`/login${q}`)
     }
-  }, [isHydrated, token, email, router])
+  }, [isHydrated, token, email, router, redirectTo])
 
   React.useEffect(() => {
     if (!resendCooldown) return
@@ -82,7 +90,7 @@ function VerifyPageContent() {
       })
       if (!res.token) throw new Error(res.message || "No token returned")
       setAuth(res.token, res.user)
-      router.push("/dashboard")
+      router.push(redirectTo)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong")
     } finally {
@@ -241,7 +249,7 @@ function VerifyPageContent() {
           )}
 
           <Link
-            href="/login"
+            href={redirectTo !== "/dashboard" ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login"}
             onClick={() => setEmail(null)}
             className="mt-4 flex justify-center text-sm text-muted-foreground hover:text-foreground"
           >

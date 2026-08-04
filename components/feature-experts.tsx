@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { Search, Video, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useGet } from "@/hooks/use-get"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
-import { mapExpertToItem, type ExpertItem } from "@/lib/experts-data"
+import { PLACEHOLDER_AVATAR, mapExpertToItem, type ExpertItem } from "@/lib/experts-data"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { cn } from "@/lib/utils"
 
@@ -196,12 +195,16 @@ export function FeatureExperts() {
                 >
                   <Card className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-lg">
                     <div className="relative h-44 w-full shrink-0 overflow-hidden bg-muted">
-                      <Image
-                        src={expert.image}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={expert.image || PLACEHOLDER_AVATAR}
                         alt={expert.name}
-                        fill
-                        className="object-cover"
-                        sizes="280px"
+                        className="size-full object-cover"
+                        onError={(e) => {
+                          if (e.currentTarget.src !== PLACEHOLDER_AVATAR) {
+                            e.currentTarget.src = PLACEHOLDER_AVATAR
+                          }
+                        }}
                       />
                       <div className="absolute right-2 top-2">
                         <Badge variant="secondary" className="text-xs">

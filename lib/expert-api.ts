@@ -1,4 +1,4 @@
-import { get, postForm, put } from "@/lib/api-client"
+import { get, post, postForm, put } from "@/lib/api-client"
 import type { ApiEnvelope } from "@/lib/auth-api"
 
 export const EXPERTS_API_URL = "/experts"
@@ -96,6 +96,96 @@ export async function fetchExpertAvailableSlots(
   return get<ApiEnvelope<ExpertAvailableSlotsData>>(
     `${EXPERTS_API_URL}/${userId}/available-slots?date=${encodeURIComponent(date)}`
   )
+}
+
+export const BOOKINGS_API_URL = "/bookings"
+export const USER_BOOKINGS_API_URL = "/user/bookings"
+
+export type CreateBookingInput = {
+  expert_id: number
+  availability_slot_id: number
+  date: string
+  notes?: string | null
+}
+
+export type BookingExpert = {
+  id: number
+  name: string
+  professional_headline?: string | null
+  avatar_url?: string | null
+  slot_price?: number | null
+}
+
+export type BookingEntity = {
+  id: number
+  status: string
+  scheduled_date: string
+  start_time: string
+  end_time: string
+  notes: string | null
+  availability_slot_id: number
+  expert?: BookingExpert | null
+  user?: { id: number; name: string } | null
+  meeting?: unknown
+  created_at?: string
+  updated_at?: string
+}
+
+export type UserBookingsParams = {
+  status?: "confirmed" | "cancelled"
+  page?: number
+  per_page?: number
+}
+
+export type PaginatedBookings = {
+  data: BookingEntity[]
+  meta?: {
+    current_page?: number
+    last_page?: number
+    per_page?: number
+    total?: number
+  }
+  links?: unknown
+}
+
+function normalizeBookingsPayload(
+  raw: BookingEntity[] | PaginatedBookings | null | undefined
+): PaginatedBookings {
+  if (Array.isArray(raw)) {
+    return { data: raw, meta: { total: raw.length, current_page: 1, last_page: 1 } }
+  }
+  if (raw && Array.isArray(raw.data)) {
+    return raw
+  }
+  return { data: [], meta: { total: 0, current_page: 1, last_page: 1 } }
+}
+
+function bookingsQuery(params?: UserBookingsParams): string {
+  if (!params) return ""
+  const q = new URLSearchParams()
+  if (params.status) q.set("status", params.status)
+  if (params.page != null) q.set("page", String(params.page))
+  if (params.per_page != null) q.set("per_page", String(params.per_page))
+  const s = q.toString()
+  return s ? `?${s}` : ""
+}
+
+export async function createBooking(token: string, input: CreateBookingInput) {
+  return post<ApiEnvelope<BookingEntity>>(BOOKINGS_API_URL, input, { token })
+}
+
+export async function fetchUserBookings(
+  token: string,
+  params?: UserBookingsParams
+) {
+  const res = await get<ApiEnvelope<BookingEntity[] | PaginatedBookings>>(
+    `${USER_BOOKINGS_API_URL}${bookingsQuery(params)}`,
+    { token }
+  )
+  return {
+    ...res,
+    data: normalizeBookingsPayload(res.data),
+  }
 }
 
 export type ExpertApplication = {

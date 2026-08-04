@@ -8,6 +8,7 @@ import {
   type ExpertDetailEntity,
   type PortfolioEntry,
 } from "@/lib/expert-api"
+import { resolveAvatarUrl } from "@/lib/auth-api"
 import { PLACEHOLDER_AVATAR, type ExpertItem, mapExpertToItem } from "./experts-data"
 
 export type EducationItem = {
@@ -179,7 +180,7 @@ export function mapExpertToDetail(expert: ExpertDetailEntity): ExpertDetail {
 
   return {
     ...base,
-    image: expert.avatar_url || PLACEHOLDER_AVATAR,
+    image: resolveAvatarUrl(expert.avatar_url || expert.avatar) || PLACEHOLDER_AVATAR,
     verified: true,
     identityVerified: true,
     yearsExperience: expert.years_of_experience ?? 0,

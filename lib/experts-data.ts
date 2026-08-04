@@ -1,4 +1,5 @@
 import type { ExpertEntity } from "@/lib/expert-api"
+import { resolveAvatarUrl } from "@/lib/auth-api"
 
 export const PLACEHOLDER_AVATAR =
   "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop"
@@ -34,7 +35,7 @@ export function mapExpertToItem(expert: ExpertEntity): ExpertItem {
     headline: expert.professional_headline ?? "",
     bio: expert.bio ?? "",
     yearsExperience: expert.years_of_experience ?? 0,
-    image: expert.avatar_url || PLACEHOLDER_AVATAR,
+    image: resolveAvatarUrl(expert.avatar_url || expert.avatar) || PLACEHOLDER_AVATAR,
     languages,
     skills,
     expertCode: expert.expert_code ?? "",

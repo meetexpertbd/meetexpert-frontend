@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   BadgeCheck,
@@ -29,8 +29,10 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { fetchExpertAvailableSlots, type ExpertAvailableSlot } from "@/lib/expert-api"
+import { fetchExpertAvailableSlots, createBooking, type ExpertAvailableSlot } from "@/lib/expert-api"
 import type { ExpertDetail } from "@/lib/expert-detail-data"
+import { ApiError } from "@/lib/api-client"
+import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
 
 type TabId = "info" | "experience" | "reviews" | "slots"
@@ -132,6 +134,10 @@ function mapApiSlots(date: string, slots: ExpertAvailableSlot[]): BookableSlot[]
 }
 
 export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
+  const router = useRouter()
+  const token = useAuthStore((s) => s.token)
+  const isHydrated = useAuthStore((s) => s.isHydrated)
+
   const [tab, setTab] = React.useState<TabId>("info")
   const [selectedSlotId, setSelectedSlotId] = React.useState<string | null>(null)
   const [bookingState, setBookingState] = React.useState<"idle" | "done">("idle")
@@ -140,6 +146,8 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
   const [slotsLoading, setSlotsLoading] = React.useState(false)
   const [slotsError, setSlotsError] = React.useState<string | null>(null)
   const [slotsLoaded, setSlotsLoaded] = React.useState(false)
+  const [bookingLoading, setBookingLoading] = React.useState(false)
+  const [bookingError, setBookingError] = React.useState<string | null>(null)
 
   const avgReview =
     expert.reviews.length > 0
@@ -227,7 +235,59 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     setSelectedSlotId(null)
     setBookedSlotLabel("")
     setBookingState("idle")
+    setBookingError(null)
     setTab("slots")
+  }
+
+  const loginHref = `/login?redirect=${encodeURIComponent(`/experts/${expert.id}`)}`
+
+  const handleConfirmBooking = async () => {
+    if (!selectedSlot || !selectedSlot.available) return
+    setBookingError(null)
+
+    if (!isHydrated) return
+    if (!token) {
+      router.push(loginHref)
+      return
+    }
+
+    setBookingLoading(true)
+    try {
+      await createBooking(token, {
+        expert_id: Number(expert.id),
+        availability_slot_id: selectedSlot.slotId,
+        date: selectedSlot.date,
+      })
+      setBookedSlotLabel(
+        `${DAY_LABELS[selectedSlot.dayOfWeek]} · ${formatTime(selectedSlot.start)} · ${selectedSlot.date}`
+      )
+      setBookingState("done")
+      setSlots((prev) =>
+        prev.map((s) =>
+          s.id === selectedSlot.id ? { ...s, available: false } : s
+        )
+      )
+      setSelectedSlotId(null)
+    } catch (e) {
+      let message = "Could not complete booking."
+      if (e instanceof ApiError) {
+        const body = e.body
+        if (body && typeof body === "object" && "errors" in body) {
+          const errors = (body as { errors?: Record<string, string[] | string> }).errors
+          const first = errors
+            ? Object.values(errors).flatMap((v) => (Array.isArray(v) ? v : [v]))[0]
+            : null
+          message = first || e.message
+        } else {
+          message = e.message
+        }
+      } else if (e instanceof Error) {
+        message = e.message
+      }
+      setBookingError(message)
+    } finally {
+      setBookingLoading(false)
+    }
   }
 
   const share = () => {
@@ -254,13 +314,11 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
             <div className="relative mx-auto shrink-0 lg:mx-0">
               <div className="relative size-36 overflow-hidden rounded-xl border border-border bg-muted sm:size-40">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={expert.image}
                   alt={expert.name}
-                  fill
-                  className="object-cover"
-                  sizes="160px"
-                  priority
+                  className="size-full object-cover"
                 />
               </div>
 
@@ -705,17 +763,22 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                             <span className="font-medium text-foreground">{bookedSlotLabel}</span>.
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setBookingState("idle")
-                            setSelectedSlotId(null)
-                            setBookedSlotLabel("")
-                          }}
-                        >
-                          Book another slot
-                        </Button>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                          <Button type="button" variant="outline" asChild>
+                            <Link href="/dashboard/bookings">View bookings</Link>
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setBookingState("idle")
+                              setSelectedSlotId(null)
+                              setBookedSlotLabel("")
+                              setBookingError(null)
+                            }}
+                          >
+                            Book another slot
+                          </Button>
+                        </div>
                       </div>
                     ) : slotsLoading ? (
                       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -725,6 +788,15 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                       <p className="py-8 text-center text-sm text-muted-foreground">{slotsError}</p>
                     ) : (
                       <>
+                        {!token && isHydrated && (
+                          <p className="mb-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                            <Link href={loginHref} className="font-medium text-primary hover:underline">
+                              Log in
+                            </Link>{" "}
+                            to confirm a booking.
+                          </p>
+                        )}
+
                         <div className="space-y-5">
                           {slotsByDay.map((group) => (
                             <div key={group.dayOfWeek}>
@@ -738,8 +810,11 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                                     <button
                                       key={s.id}
                                       type="button"
-                                      disabled={!s.available}
-                                      onClick={() => setSelectedSlotId(s.id)}
+                                      disabled={!s.available || bookingLoading}
+                                      onClick={() => {
+                                        setSelectedSlotId(s.id)
+                                        setBookingError(null)
+                                      }}
                                       className={cn(
                                         "flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-colors",
                                         s.available
@@ -764,34 +839,36 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                           ))}
                         </div>
 
+                        {bookingError && (
+                          <p className="mt-4 text-sm text-destructive">{bookingError}</p>
+                        )}
+
                         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <Button
                             type="button"
                             variant="outline"
                             className="sm:flex-1"
-                            onClick={() => setSelectedSlotId(null)}
+                            disabled={bookingLoading}
+                            onClick={() => {
+                              setSelectedSlotId(null)
+                              setBookingError(null)
+                            }}
                           >
                             Clear
                           </Button>
                           <Button
                             type="button"
                             className="gap-2 sm:flex-1"
-                            disabled={!selectedSlot || !selectedSlot.available}
-                            onClick={() => {
-                              if (!selectedSlot) return
-                              setBookedSlotLabel(
-                                `${DAY_LABELS[selectedSlot.dayOfWeek]} · ${formatTime(selectedSlot.start)} · ${selectedSlot.date}`
-                              )
-                              setBookingState("done")
-                            }}
+                            disabled={!selectedSlot || !selectedSlot.available || bookingLoading}
+                            onClick={() => void handleConfirmBooking()}
                           >
-                            Confirm booking
+                            {bookingLoading
+                              ? "Booking…"
+                              : !token && isHydrated
+                                ? "Log in to book"
+                                : "Confirm booking"}
                           </Button>
                         </div>
-
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          Slot selection uses live availability. Payment checkout is not connected yet.
-                        </p>
                       </>
                     )}
                   </CardContent>

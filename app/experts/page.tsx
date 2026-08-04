@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { Search, Video } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useGet } from "@/hooks/use-get"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
-import { mapExpertToItem, type ExpertItem } from "@/lib/experts-data"
+import { PLACEHOLDER_AVATAR, mapExpertToItem, type ExpertItem } from "@/lib/experts-data"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { cn } from "@/lib/utils"
 
@@ -174,15 +173,24 @@ export default function ExpertsPage() {
 }
 
 function ExpertCard({ expert }: { expert: ExpertItem }) {
+  const [imgFailed, setImgFailed] = React.useState(false)
+  const src = !imgFailed && expert.image ? expert.image : PLACEHOLDER_AVATAR
+
+  React.useEffect(() => {
+    setImgFailed(false)
+  }, [expert.image])
+
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-md">
       <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
-        <Image
-          src={expert.image}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
           alt={expert.name}
-          fill
-          className="object-cover"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="size-full object-cover"
+          onError={() => {
+            if (src !== PLACEHOLDER_AVATAR) setImgFailed(true)
+          }}
         />
         <div className="absolute right-2 top-2">
           <Badge variant="secondary" className="text-xs">
