@@ -211,6 +211,71 @@ export async function fetchExpertBookings(
   }
 }
 
+export type AgoraMeetingCredentials = {
+  app_id: string
+  channel: string
+  token: string
+  uid: string | number
+}
+
+function pickString(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = obj[key]
+    if (typeof value === "string" && value.trim()) return value.trim()
+    if (typeof value === "number" && Number.isFinite(value)) return String(value)
+  }
+  return null
+}
+
+export function normalizeMeetingCredentials(
+  raw: unknown
+): AgoraMeetingCredentials | null {
+  if (!raw || typeof raw !== "object") return null
+  const obj = raw as Record<string, unknown>
+  const nested =
+    obj.data && typeof obj.data === "object"
+      ? (obj.data as Record<string, unknown>)
+      : obj.meeting && typeof obj.meeting === "object"
+        ? (obj.meeting as Record<string, unknown>)
+        : obj
+
+  const appId =
+    pickString(nested, ["app_id", "appId", "agora_app_id"]) ??
+    process.env.NEXT_PUBLIC_AGORA_APP_ID ??
+    null
+  const channel = pickString(nested, [
+    "channel",
+    "channel_name",
+    "channelName",
+    "agora_channel",
+  ])
+  const token =
+    pickString(nested, [
+      "token",
+      "rtc_token",
+      "rtcToken",
+      "agora_token",
+    ]) ?? ""
+  const uidRaw = nested.uid ?? nested.user_id ?? nested.userId ?? nested.agora_uid
+  const uid =
+    typeof uidRaw === "number" || typeof uidRaw === "string"
+      ? uidRaw
+      : pickString(nested, ["uid", "user_id", "userId"]) ?? 0
+
+  if (!appId || !channel) return null
+
+  return {
+    app_id: appId,
+    channel,
+    token,
+    uid,
+  }
+}
+
+export async function fetchBookingMeeting(token: string, bookingId: number | string) {
+  return get<ApiEnvelope<unknown>>(`/bookings/${bookingId}/meeting`, { token })
+}
+
 export type ExpertApplication = {
   id?: number
   category_id: number

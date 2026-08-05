@@ -165,14 +165,18 @@ function UserBookingCard({ booking }: { booking: BookingEntity }) {
           )}
         </div>
 
-        {expertHref && (
+        {booking.status.toLowerCase() === "confirmed" ? (
           <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
-            <Link href={expertHref}>
+            <Link href={`/dashboard/meeting/${booking.id}`}>
               <Video className="size-4" />
               Join
             </Link>
           </Button>
-        )}
+        ) : expertHref ? (
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
+            <Link href={expertHref}>View expert</Link>
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -226,10 +230,14 @@ function ExpertBookingCard({ booking }: { booking: BookingEntity }) {
           )}
         </div>
 
-        <Button variant="outline" size="sm" className="shrink-0 gap-1.5" type="button">
-          <Video className="size-4" />
-          Join
-        </Button>
+        {booking.status.toLowerCase() === "confirmed" ? (
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
+            <Link href={`/dashboard/meeting/${booking.id}`}>
+              <Video className="size-4" />
+              Join
+            </Link>
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   )

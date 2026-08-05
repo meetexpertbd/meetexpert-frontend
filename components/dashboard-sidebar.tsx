@@ -108,6 +108,12 @@ const USER_ALLOWED = new Set([
   "/dashboard/reviews",
   "/dashboard/settings",
 ])
+
+function isUserAllowedPath(pathname: string) {
+  if (USER_ALLOWED.has(pathname)) return true
+  if (pathname.startsWith("/dashboard/meeting/")) return true
+  return false
+}
 export function DashboardSidebar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -137,7 +143,7 @@ export function DashboardSidebar() {
 
   React.useEffect(() => {
     if (userType !== "user") return
-    if (pathname === "/dashboard" || !USER_ALLOWED.has(pathname)) {
+    if (pathname === "/dashboard" || !isUserAllowedPath(pathname)) {
       router.replace(USER_HOME)
     }
   }, [pathname, userType, router])
