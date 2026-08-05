@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Star,
   Video,
+  Check,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +30,20 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 import { fetchExpertAvailableSlots, createBooking, type ExpertAvailableSlot } from "@/lib/expert-api"
 import type { ExpertDetail } from "@/lib/expert-detail-data"
 import { ApiError } from "@/lib/api-client"
@@ -45,6 +60,11 @@ const TABS = [
 ]
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const DAY_LABELS_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+const MONTH_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
 
 type BookableSlot = {
   id: string
@@ -54,6 +74,7 @@ type BookableSlot = {
   label: string
   time: string
   start: string
+  end: string
   available: boolean
   price: number | null
 }
@@ -75,6 +96,16 @@ function toDateKey(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+function parseDateKey(date: string): Date {
+  return new Date(`${date}T00:00:00`)
+}
+
+function formatCircleDate(date: string): string {
+  const d = parseDateKey(date)
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${day}-${MONTH_SHORT[d.getMonth()]}`
+}
+
 function upcomingDates(daysAhead = 14): string[] {
   const out: string[] = []
   const start = new Date()
@@ -85,6 +116,24 @@ function upcomingDates(daysAhead = 14): string[] {
     out.push(toDateKey(d))
   }
   return out
+}
+
+function isDateBeforeToday(date: string): boolean {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return parseDateKey(date).getTime() < today.getTime()
+}
+
+function isSlotPast(date: string, start: string): boolean {
+  const m = start.match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return false
+  const slotAt = parseDateKey(date)
+  slotAt.setHours(Number(m[1]), Number(m[2]), 0, 0)
+  return slotAt.getTime() <= Date.now()
+}
+
+function isSlotBookable(slot: BookableSlot): boolean {
+  return slot.available && !isSlotPast(slot.date, slot.start)
 }
 
 function compareSlots(a: BookableSlot, b: BookableSlot): number {
@@ -113,6 +162,20 @@ function Stars({ value }: { value: number }) {
   )
 }
 
+function useIsDesktop(breakpoint = "(min-width: 768px)") {
+  const [isDesktop, setIsDesktop] = React.useState(false)
+
+  React.useEffect(() => {
+    const mq = window.matchMedia(breakpoint)
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener("change", update)
+    return () => mq.removeEventListener("change", update)
+  }, [breakpoint])
+
+  return isDesktop
+}
+
 function mapApiSlots(date: string, slots: ExpertAvailableSlot[]): BookableSlot[] {
   const d = new Date(`${date}T00:00:00`)
   const dayOfWeek = d.getDay()
@@ -127,6 +190,7 @@ function mapApiSlots(date: string, slots: ExpertAvailableSlot[]): BookableSlot[]
       label: `${dayLabel} · ${formatTime(s.start)}`,
       time,
       start: s.start,
+      end: s.end,
       available: !s.is_booked,
       price: s.slot_price,
     }
@@ -137,8 +201,11 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
   const router = useRouter()
   const token = useAuthStore((s) => s.token)
   const isHydrated = useAuthStore((s) => s.isHydrated)
+  const isDesktop = useIsDesktop()
 
   const [tab, setTab] = React.useState<TabId>("info")
+  const [bookingOpen, setBookingOpen] = React.useState(false)
+  const [selectedDate, setSelectedDate] = React.useState<string | null>(null)
   const [selectedSlotId, setSelectedSlotId] = React.useState<string | null>(null)
   const [bookingState, setBookingState] = React.useState<"idle" | "done">("idle")
   const [bookedSlotLabel, setBookedSlotLabel] = React.useState<string>("")
@@ -163,6 +230,47 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     [expert.availability]
   )
 
+  const bookingDates = React.useMemo(() => {
+    const pool = upcomingDates(14)
+    const today = toDateKey(new Date())
+    let start = 0
+
+    if (slotsLoaded) {
+      const todayHadSlots = slots.some((s) => s.date === today)
+      const todayBookable = slots.some(
+        (s) => s.date === today && isSlotBookable(s)
+      )
+      if (todayHadSlots && !todayBookable) {
+        const idx = pool.indexOf(today)
+        start = idx >= 0 ? idx + 1 : 1
+      }
+    }
+
+    return pool.slice(start, start + 7)
+  }, [bookingOpen, slots, slotsLoaded])
+
+  const slotsByDate = React.useMemo(() => {
+    const map = new Map<string, BookableSlot[]>()
+    for (const date of bookingDates) map.set(date, [])
+    for (const slot of slots) {
+      if (isDateBeforeToday(slot.date)) continue
+      const list = map.get(slot.date)
+      if (list) list.push(slot)
+      else if (bookingDates.includes(slot.date)) map.set(slot.date, [slot])
+    }
+    for (const list of map.values()) {
+      list.sort(compareSlots)
+    }
+    return map
+  }, [slots, bookingDates])
+
+  const slotsForSelectedDate = React.useMemo(() => {
+    if (!selectedDate) return []
+    return (slotsByDate.get(selectedDate) ?? []).filter(
+      (s) => !isSlotPast(s.date, s.start)
+    )
+  }, [slotsByDate, selectedDate])
+
   const slotsByDay = React.useMemo(() => {
     const groups: { dayOfWeek: number; label: string; slots: BookableSlot[] }[] = []
     for (let dow = 0; dow < 7; dow++) {
@@ -186,14 +294,10 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
   )
 
   React.useEffect(() => {
-    if (tab !== "slots" || slotsLoaded) return
+    if ((!bookingOpen && tab !== "slots") || slotsLoaded) return
 
     let cancelled = false
-    const enabledDow = new Set(enabledDays.map((d) => d.day_of_week))
-    const dates = upcomingDates(14).filter((date) => {
-      const dow = new Date(`${date}T00:00:00`).getDay()
-      return enabledDow.has(dow)
-    })
+    const dates = upcomingDates(14)
 
     setSlotsLoading(true)
     setSlotsError(null)
@@ -216,7 +320,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
         if (flat.length === 0 && enabledDays.length === 0) {
           setSlotsError("This expert has no availability yet.")
         } else if (flat.length === 0) {
-          setSlotsError("No open slots in the next two weeks.")
+          setSlotsError("No open slots in the next 7 days.")
         }
       })
       .catch(() => {
@@ -229,14 +333,36 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     return () => {
       cancelled = true
     }
-  }, [tab, expert.id, enabledDays, slotsLoaded])
+  }, [bookingOpen, tab, expert.id, enabledDays, slotsLoaded])
 
-  const openSlotsTab = () => {
+  React.useEffect(() => {
+    if (!bookingOpen || slotsLoading || bookingDates.length === 0) return
+
+    const firstWithSlots = bookingDates.find((date) =>
+      (slotsByDate.get(date) ?? []).some(isSlotBookable)
+    )
+    const nextDate = firstWithSlots ?? bookingDates[0] ?? null
+
+    setSelectedDate((current) => {
+      if (current && bookingDates.includes(current)) {
+        const currentSlots = (slotsByDate.get(current) ?? []).filter(
+          (s) => !isSlotPast(s.date, s.start)
+        )
+        if (currentSlots.some(isSlotBookable) || currentSlots.length > 0) {
+          return current
+        }
+      }
+      return nextDate
+    })
+  }, [bookingOpen, slotsLoading, bookingDates, slotsByDate])
+
+  const openBooking = () => {
     setSelectedSlotId(null)
+    setSelectedDate(null)
     setBookedSlotLabel("")
     setBookingState("idle")
     setBookingError(null)
-    setTab("slots")
+    setBookingOpen(true)
   }
 
   const loginHref = `/login?redirect=${encodeURIComponent(`/experts/${expert.id}`)}`
@@ -294,6 +420,175 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     const url = typeof window !== "undefined" ? window.location.href : ""
     void navigator.clipboard?.writeText(url).catch(() => {})
   }
+
+  const bookingPanelBody = (
+    <div className="space-y-5">
+      {bookingState === "done" ? (
+        <div className="space-y-4 py-2 text-center">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+            <BadgeCheck className="size-6" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-lg font-semibold text-foreground">Booked!</p>
+            <p className="text-sm text-muted-foreground">
+              Your session is confirmed for{" "}
+              <span className="font-medium text-foreground">{bookedSlotLabel}</span>.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button type="button" variant="outline" asChild>
+              <Link href="/dashboard/bookings">View bookings</Link>
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setBookingState("idle")
+                setSelectedSlotId(null)
+                setBookedSlotLabel("")
+                setBookingError(null)
+              }}
+            >
+              Book another slot
+            </Button>
+          </div>
+        </div>
+      ) : slotsLoading ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Loading available slots…
+        </p>
+      ) : slotsError ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">{slotsError}</p>
+      ) : (
+        <>
+          {!token && isHydrated && (
+            <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              <Link href={loginHref} className="font-medium text-primary hover:underline">
+                Log in
+              </Link>{" "}
+              to confirm a booking.
+            </p>
+          )}
+
+          <div className="flex gap-3 overflow-x-auto pt-5 pb-1 scrollbar-none md:justify-between md:overflow-visible md:px-0">
+            {bookingDates.map((date) => {
+              const d = parseDateKey(date)
+              const isSelected = date === selectedDate
+              const hasSlots = (slotsByDate.get(date) ?? []).some(isSlotBookable)
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(date)
+                    setSelectedSlotId(null)
+                    setBookingError(null)
+                  }}
+                  className="relative flex shrink-0 flex-col items-center gap-1.5"
+                  aria-pressed={isSelected}
+                  aria-label={`${DAY_LABELS[d.getDay()]} ${formatCircleDate(date)}`}
+                >
+                  {isSelected && (
+                    <span className="absolute -top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                      <Check className="size-3 stroke-[3]" />
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "flex size-[4.5rem] flex-col items-center justify-center rounded-full border text-center transition-colors",
+                      isSelected
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : hasSlots
+                          ? "border-border bg-card text-foreground hover:border-primary/40"
+                          : "border-dashed border-border bg-muted/30 text-muted-foreground"
+                    )}
+                  >
+                    <span className="text-[11px] font-semibold uppercase tracking-wide">
+                      {DAY_LABELS_SHORT[d.getDay()]}
+                    </span>
+                    <span className="my-0.5 h-px w-8 bg-border" />
+                    <span className="text-[11px] font-medium">{formatCircleDate(date)}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="space-y-3">
+            {slotsForSelectedDate.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No slots available for this day.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {slotsForSelectedDate.map((s) => {
+                  const isSelected = s.id === selectedSlotId
+                  const bookable = isSlotBookable(s)
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={!bookable || bookingLoading}
+                      onClick={() => {
+                        setSelectedSlotId(s.id)
+                        setBookingError(null)
+                      }}
+                      className={cn(
+                        "min-w-[7.5rem] flex-1 rounded-xl border px-4 py-3 text-center transition-colors sm:flex-none",
+                        bookable
+                          ? "bg-card hover:border-primary/40 hover:bg-muted/30"
+                          : "cursor-not-allowed bg-muted/20 opacity-60",
+                        isSelected ? "border-primary bg-primary/5" : "border-border"
+                      )}
+                    >
+                      <span className="block text-sm font-semibold text-foreground">
+                        {formatTime(s.start)} – {formatTime(s.end)}
+                      </span>
+                      {!bookable && (
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          Booked
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {bookingError && (
+            <p className="text-sm text-destructive">{bookingError}</p>
+          )}
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="sm:flex-1"
+              disabled={bookingLoading}
+              onClick={() => {
+                setSelectedSlotId(null)
+                setBookingError(null)
+              }}
+            >
+              Clear
+            </Button>
+            <Button
+              type="button"
+              className="gap-2 sm:flex-1"
+              disabled={!selectedSlot || !isSlotBookable(selectedSlot) || bookingLoading}
+              onClick={() => void handleConfirmBooking()}
+            >
+              {bookingLoading
+                ? "Booking…"
+                : !token && isHydrated
+                  ? "Log in to book"
+                  : "Confirm booking"}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-background">
@@ -428,7 +723,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                 className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
                 type="button"
                 disabled={enabledDays.length === 0}
-                onClick={openSlotsTab}
+                onClick={openBooking}
               >
                 <Video className="size-4" />
                 See expert now
@@ -878,6 +1173,36 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
           </div>
         </div>
       </div>
+
+      {isDesktop ? (
+        <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+          <DialogContent className="flex max-h-[85vh] w-full flex-col gap-4 overflow-x-hidden overflow-y-hidden sm:max-w-3xl">
+            <DialogHeader className="shrink-0 pr-8">
+              <DialogTitle>See {expert.name} now</DialogTitle>
+              <DialogDescription>
+                Pick an upcoming open slot
+                {expert.price ? ` · ${expert.price}` : ""}
+                {expert.duration ? ` · ${expert.duration}` : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="min-h-0 overflow-x-hidden overflow-y-auto">{bookingPanelBody}</div>
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <Drawer open={bookingOpen} onOpenChange={setBookingOpen}>
+          <DrawerContent className="overflow-hidden">
+            <DrawerHeader className="shrink-0">
+              <DrawerTitle>See {expert.name} now</DrawerTitle>
+              <DrawerDescription>
+                Pick an upcoming open slot
+                {expert.price ? ` · ${expert.price}` : ""}
+                {expert.duration ? ` · ${expert.duration}` : ""}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">{bookingPanelBody}</div>
+          </DrawerContent>
+        </Drawer>
+      )}
     </div>
   )
 }
