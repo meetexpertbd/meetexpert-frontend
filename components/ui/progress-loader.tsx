@@ -41,15 +41,22 @@ export function ProgressLoader({
     }
 
     setProgress(0)
-    const started = performance.now()
     let frame = 0
+    let cycleStart = performance.now()
 
     const tick = (now: number) => {
-      const next = Math.min(100, Math.round(((now - started) / duration) * 100))
-      setProgress((prev) => Math.max(prev, next))
-      if (next < 100) {
-        frame = requestAnimationFrame(tick)
+      const elapsed = now - cycleStart
+      const next = Math.round((elapsed / duration) * 100)
+      if (next >= 100) {
+        setProgress(100)
+        setTimeout(() => {
+          cycleStart = performance.now()
+          setProgress(0)
+        }, 120)
+      } else {
+        setProgress(next)
       }
+      frame = requestAnimationFrame(tick)
     }
 
     frame = requestAnimationFrame(tick)

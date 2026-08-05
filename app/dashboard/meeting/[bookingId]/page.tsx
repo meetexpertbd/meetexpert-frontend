@@ -27,7 +27,7 @@ type AgoraClient = {
     channel: string,
     token: string | null,
     uid: number | null
-  ) => Promise<void>
+  ) => Promise<unknown>
   leave: () => Promise<void>
   publish: (tracks: unknown[]) => Promise<void>
   on: (event: string, handler: (...args: unknown[]) => void) => void
@@ -46,24 +46,6 @@ type AgoraMediaTrack = {
   stop: () => void
   close: () => void
   setEnabled: (enabled: boolean) => Promise<void>
-}
-
-function canUseMediaDevices(): boolean {
-  if (typeof window === "undefined") return false
-  return Boolean(window.isSecureContext && navigator.mediaDevices?.getUserMedia)
-}
-
-function mediaUnavailableMessage(): string {
-  if (typeof window === "undefined") {
-    return "Camera and microphone are only available in the browser."
-  }
-  if (!window.isSecureContext) {
-    return "Camera and microphone require HTTPS (or localhost). Open the site over a secure connection and try again."
-  }
-  if (!navigator.mediaDevices?.getUserMedia) {
-    return "This browser does not support camera or microphone access."
-  }
-  return "Camera and microphone are unavailable."
 }
 
 export default function MeetingPage() {
@@ -89,9 +71,7 @@ export default function MeetingPage() {
   const audioTrackRef = React.useRef<AgoraMediaTrack | null>(null)
   const videoTrackRef = React.useRef<AgoraMediaTrack | null>(null)
 
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
+  React.useEffect(() => { setMounted(true) }, [])
 
   const cleanup = React.useCallback(async () => {
     try {
@@ -113,11 +93,16 @@ export default function MeetingPage() {
     setRemoteUid(null)
   }, [])
 
+  React.useEffect(() => () => { void cleanup() }, [cleanup])
+
+  // Play local video once the room UI is rendered (localRef is available)
   React.useEffect(() => {
-    return () => {
-      void cleanup()
+    if (status !== "ready") return
+    const track = videoTrackRef.current
+    if (track && localRef.current) {
+      track.play(localRef.current)
     }
-  }, [cleanup])
+  }, [status])
 
   React.useEffect(() => {
     if (!mounted || !isHydrated) return
@@ -127,11 +112,6 @@ export default function MeetingPage() {
     }
     if (!bookingId) {
       setError("Invalid booking.")
-      setStatus("error")
-      return
-    }
-    if (!canUseMediaDevices()) {
-      setError(mediaUnavailableMessage())
       setStatus("error")
       return
     }
@@ -151,6 +131,8 @@ export default function MeetingPage() {
           throw new Error("Meeting credentials are incomplete.")
         }
 
+        if (cancelled) return
+
         await cleanup()
 
         const client = AgoraRTC.createClient({
@@ -160,30 +142,30 @@ export default function MeetingPage() {
         clientRef.current = client
 
         client.on("user-published", async (remoteUser, mediaType) => {
-          const user = remoteUser as AgoraRemoteUser
+          const rUser = remoteUser as AgoraRemoteUser
           const type = mediaType as string
-          await client.subscribe(user, type)
+          await client.subscribe(rUser, type)
           if (type === "video") {
-            setRemoteUid(user.uid)
+            setRemoteUid(rUser.uid)
             if (remoteRef.current) {
-              user.videoTrack?.play(remoteRef.current)
+              rUser.videoTrack?.play(remoteRef.current)
             }
           }
           if (type === "audio") {
-            user.audioTrack?.play()
+            rUser.audioTrack?.play()
           }
         })
 
         client.on("user-unpublished", (remoteUser, mediaType) => {
-          const user = remoteUser as AgoraRemoteUser
+          const rUser = remoteUser as AgoraRemoteUser
           if ((mediaType as string) === "video") {
-            setRemoteUid((current) => (current === user.uid ? null : current))
+            setRemoteUid((cur) => (cur === rUser.uid ? null : cur))
           }
         })
 
         client.on("user-left", (remoteUser) => {
-          const user = remoteUser as AgoraRemoteUser
-          setRemoteUid((current) => (current === user.uid ? null : current))
+          const rUser = remoteUser as AgoraRemoteUser
+          setRemoteUid((cur) => (cur === rUser.uid ? null : cur))
         })
 
         const uid =
@@ -198,23 +180,39 @@ export default function MeetingPage() {
           uid
         )
 
-        const [audioTrack, videoTrack] =
-          (await AgoraRTC.createMicrophoneAndCameraTracks()) as [
+        if (cancelled) return
+
+        // Get local tracks — allow camera to fail gracefully so mic still works
+        let audioTrack: AgoraMediaTrack | null = null
+        let videoTrack: AgoraMediaTrack | null = null
+
+        try {
+          const tracks = (await AgoraRTC.createMicrophoneAndCameraTracks()) as [
             AgoraMediaTrack,
             AgoraMediaTrack,
           ]
-        audioTrackRef.current = audioTrack
-        videoTrackRef.current = videoTrack
-
-        if (localRef.current) {
-          videoTrack.play(localRef.current)
+          audioTrack = tracks[0]
+          videoTrack = tracks[1]
+        } catch {
+          try {
+            audioTrack = (await AgoraRTC.createMicrophoneAudioTrack()) as AgoraMediaTrack
+          } catch {
+            // no mic either — continue without local tracks
+          }
         }
 
-        await client.publish([audioTrack, videoTrack])
+        if (audioTrack) audioTrackRef.current = audioTrack
+        if (videoTrack) videoTrackRef.current = videoTrack
+
+        const toPublish = [audioTrack, videoTrack].filter(Boolean)
+        if (toPublish.length > 0) {
+          await client.publish(toPublish)
+        }
 
         if (!cancelled) {
           setJoined(true)
           setStatus("ready")
+          // localRef won't exist yet — played in the status effect above
         }
       } catch (e) {
         if (cancelled) return
@@ -229,9 +227,7 @@ export default function MeetingPage() {
 
     void start()
 
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [mounted, isHydrated, token, bookingId, router, cleanup])
 
   async function toggleMic() {
@@ -247,6 +243,9 @@ export default function MeetingPage() {
     if (!track) return
     const next = !camOn
     await track.setEnabled(next)
+    if (next && localRef.current) {
+      track.play(localRef.current)
+    }
     setCamOn(next)
   }
 
@@ -302,6 +301,7 @@ export default function MeetingPage() {
       </div>
 
       <div className="relative mx-auto grid w-full max-w-6xl flex-1 gap-4 p-4 sm:grid-cols-[1.4fr_1fr] sm:p-6">
+        {/* Remote participant */}
         <div className="relative min-h-[280px] overflow-hidden rounded-2xl border border-border bg-muted/40 sm:min-h-[420px]">
           <div ref={remoteRef} className="absolute inset-0 size-full" />
           {!remoteUid && (
@@ -315,16 +315,17 @@ export default function MeetingPage() {
           </span>
         </div>
 
+        {/* Local video */}
         <div className="relative min-h-[200px] overflow-hidden rounded-2xl border border-border bg-muted/40 sm:min-h-[420px]">
           <div
             ref={localRef}
             className={cn("absolute inset-0 size-full", !camOn && "opacity-0")}
           />
-          {!camOn && (
+          {!videoTrackRef.current || !camOn ? (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
               <VideoOff className="size-8" />
             </div>
-          )}
+          ) : null}
           <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white">
             You {joined ? "· Live" : ""}
           </span>
@@ -339,6 +340,7 @@ export default function MeetingPage() {
             size="icon-lg"
             onClick={() => void toggleMic()}
             aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
+            disabled={!audioTrackRef.current}
           >
             {micOn ? <Mic className="size-5" /> : <MicOff className="size-5" />}
           </Button>
@@ -348,6 +350,7 @@ export default function MeetingPage() {
             size="icon-lg"
             onClick={() => void toggleCam()}
             aria-label={camOn ? "Turn camera off" : "Turn camera on"}
+            disabled={!videoTrackRef.current}
           >
             {camOn ? <Video className="size-5" /> : <VideoOff className="size-5" />}
           </Button>
