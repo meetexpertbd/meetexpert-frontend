@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   Mic,
   MicOff,
+  Monitor,
+  MonitorOff,
   PhoneOff,
   Video,
   VideoOff,
@@ -48,6 +50,13 @@ type AgoraMediaTrack = {
   setEnabled: (enabled: boolean) => Promise<void>
 }
 
+type AgoraScreenTrack = {
+  play: (el?: HTMLElement) => void
+  stop: () => void
+  close: () => void
+  on: (event: string, handler: () => void) => void
+}
+
 export default function MeetingPage() {
   const params = useParams<{ bookingId: string }>()
   const router = useRouter()
@@ -64,16 +73,37 @@ export default function MeetingPage() {
   const [micOn, setMicOn] = React.useState(true)
   const [camOn, setCamOn] = React.useState(true)
   const [remoteUid, setRemoteUid] = React.useState<string | number | null>(null)
+  const [sharing, setSharing] = React.useState(false)
+  const [remoteSharing, setRemoteSharing] = React.useState(false)
 
   const localRef = React.useRef<HTMLDivElement>(null)
   const remoteRef = React.useRef<HTMLDivElement>(null)
+  const screenLocalRef = React.useRef<HTMLDivElement>(null)
+  const screenRemoteRef = React.useRef<HTMLDivElement>(null)
   const clientRef = React.useRef<AgoraClient | null>(null)
   const audioTrackRef = React.useRef<AgoraMediaTrack | null>(null)
   const videoTrackRef = React.useRef<AgoraMediaTrack | null>(null)
+  const screenTrackRef = React.useRef<AgoraScreenTrack | null>(null)
+  const screenClientRef = React.useRef<AgoraClient | null>(null)
 
   React.useEffect(() => { setMounted(true) }, [])
 
+  const stopScreenShare = React.useCallback(async () => {
+    try {
+      screenTrackRef.current?.stop()
+      screenTrackRef.current?.close()
+      screenTrackRef.current = null
+      if (screenClientRef.current) {
+        screenClientRef.current.removeAllListeners()
+        await screenClientRef.current.leave()
+        screenClientRef.current = null
+      }
+    } catch { /* ignore */ }
+    setSharing(false)
+  }, [])
+
   const cleanup = React.useCallback(async () => {
+    await stopScreenShare()
     try {
       audioTrackRef.current?.stop()
       audioTrackRef.current?.close()
@@ -91,7 +121,7 @@ export default function MeetingPage() {
     }
     setJoined(false)
     setRemoteUid(null)
-  }, [])
+  }, [stopScreenShare])
 
   React.useEffect(() => () => { void cleanup() }, [cleanup])
 
@@ -166,6 +196,31 @@ export default function MeetingPage() {
         client.on("user-left", (remoteUser) => {
           const rUser = remoteUser as AgoraRemoteUser
           setRemoteUid((cur) => (cur === rUser.uid ? null : cur))
+          setRemoteSharing(false)
+        })
+
+        // Screen share: detect remote screen track by uid convention (uid + 10000)
+        client.on("user-published", async (remoteUser, mediaType) => {
+          const rUser = remoteUser as AgoraRemoteUser
+          const type = mediaType as string
+          const isScreen =
+            typeof rUser.uid === "number" && rUser.uid > 10000
+          if (!isScreen) return
+          await client.subscribe(rUser, type)
+          if (type === "video") {
+            setRemoteSharing(true)
+            if (screenRemoteRef.current) {
+              rUser.videoTrack?.play(screenRemoteRef.current)
+            }
+          }
+        })
+
+        client.on("user-unpublished", (_remoteUser, mediaType) => {
+          const type = mediaType as string
+          const rUser = _remoteUser as AgoraRemoteUser
+          const isScreen =
+            typeof rUser.uid === "number" && rUser.uid > 10000
+          if (isScreen && type === "video") setRemoteSharing(false)
         })
 
         const uid =
@@ -254,6 +309,60 @@ export default function MeetingPage() {
     router.push("/dashboard/bookings")
   }
 
+  async function toggleScreen() {
+    if (sharing) {
+      await stopScreenShare()
+      return
+    }
+    try {
+      const AgoraRTC = (await import("agora-rtc-sdk-ng")).default
+      const credentials = normalizeMeetingCredentials(
+        await fetchBookingMeeting(token!, bookingId).then((r) => r.data ?? r)
+      )
+      if (!credentials) return
+
+      const screenClient = AgoraRTC.createClient({
+        mode: "rtc",
+        codec: "vp8",
+      }) as unknown as AgoraClient
+      screenClientRef.current = screenClient
+
+      // Use a high uid to distinguish screen-share from camera
+      const screenUid =
+        (typeof credentials.uid === "number"
+          ? credentials.uid
+          : Number(credentials.uid) || 0) + 10000
+
+      await screenClient.join(
+        credentials.app_id,
+        credentials.channel,
+        credentials.token || null,
+        screenUid
+      )
+
+      const screenTrack = (await AgoraRTC.createScreenVideoTrack(
+        { encoderConfig: "1080p_1" },
+        "disable"
+      )) as unknown as AgoraScreenTrack
+
+      screenTrackRef.current = screenTrack
+
+      // Stop sharing when user ends it via browser UI
+      screenTrack.on("track-ended", () => { void stopScreenShare() })
+
+      await screenClient.publish([screenTrack as unknown])
+
+      if (screenLocalRef.current) {
+        screenTrack.play(screenLocalRef.current)
+      }
+
+      setSharing(true)
+    } catch (e) {
+      await stopScreenShare()
+      if (e instanceof Error && e.message.includes("Permission denied")) return
+    }
+  }
+
   if (!mounted || !isHydrated || status === "loading") {
     return (
       <ProgressLoaderScreen
@@ -300,35 +409,60 @@ export default function MeetingPage() {
         </Button>
       </div>
 
-      <div className="relative mx-auto grid w-full max-w-6xl flex-1 gap-4 p-4 sm:grid-cols-[1.4fr_1fr] sm:p-6">
-        {/* Remote participant */}
-        <div className="relative min-h-[280px] overflow-hidden rounded-2xl border border-border bg-muted/40 sm:min-h-[420px]">
-          <div ref={remoteRef} className="absolute inset-0 size-full" />
-          {!remoteUid && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-              <Video className="size-8" />
-              <p className="text-sm">Waiting for the other participant…</p>
-            </div>
-          )}
-          <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white">
-            Remote
-          </span>
-        </div>
+      <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4 sm:p-6">
+        {/* Screen share row (visible when either side is sharing) */}
+        {(sharing || remoteSharing) && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {remoteSharing && (
+              <div className="relative min-h-[200px] overflow-hidden rounded-2xl border border-border bg-muted/40 sm:min-h-[300px]">
+                <div ref={screenRemoteRef} className="absolute inset-0 size-full" />
+                <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white">
+                  Remote screen
+                </span>
+              </div>
+            )}
+            {sharing && (
+              <div className="relative min-h-[200px] overflow-hidden rounded-2xl border border-primary/50 bg-muted/40 sm:min-h-[300px]">
+                <div ref={screenLocalRef} className="absolute inset-0 size-full" />
+                <span className="absolute top-3 left-3 rounded-full bg-primary/80 px-2.5 py-1 text-xs text-white">
+                  Your screen
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Local video */}
-        <div className="relative min-h-[200px] overflow-hidden rounded-2xl border border-border bg-muted/40 sm:min-h-[420px]">
-          <div
-            ref={localRef}
-            className={cn("absolute inset-0 size-full", !camOn && "opacity-0")}
-          />
-          {!videoTrackRef.current || !camOn ? (
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-              <VideoOff className="size-8" />
-            </div>
-          ) : null}
-          <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white">
-            You {joined ? "· Live" : ""}
-          </span>
+        {/* Camera row */}
+        <div className="grid flex-1 gap-4 sm:grid-cols-[1.4fr_1fr]">
+          {/* Remote camera */}
+          <div className="relative min-h-[280px] overflow-hidden rounded-2xl border border-border bg-muted/40 sm:min-h-[320px]">
+            <div ref={remoteRef} className="absolute inset-0 size-full" />
+            {!remoteUid && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Video className="size-8" />
+                <p className="text-sm">Waiting for the other participant…</p>
+              </div>
+            )}
+            <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white">
+              Remote
+            </span>
+          </div>
+
+          {/* Local camera */}
+          <div className="relative min-h-[200px] overflow-hidden rounded-2xl border border-border bg-muted/40 sm:min-h-[320px]">
+            <div
+              ref={localRef}
+              className={cn("absolute inset-0 size-full", !camOn && "opacity-0")}
+            />
+            {!videoTrackRef.current || !camOn ? (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                <VideoOff className="size-8" />
+              </div>
+            ) : null}
+            <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white">
+              You {joined ? "· Live" : ""}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -353,6 +487,16 @@ export default function MeetingPage() {
             disabled={!videoTrackRef.current}
           >
             {camOn ? <Video className="size-5" /> : <VideoOff className="size-5" />}
+          </Button>
+          <Button
+            type="button"
+            variant={sharing ? "default" : "outline"}
+            size="icon-lg"
+            onClick={() => void toggleScreen()}
+            aria-label={sharing ? "Stop sharing screen" : "Share screen"}
+            title={sharing ? "Stop sharing" : "Share screen"}
+          >
+            {sharing ? <MonitorOff className="size-5" /> : <Monitor className="size-5" />}
           </Button>
           <Button
             type="button"
