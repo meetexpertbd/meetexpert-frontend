@@ -3,13 +3,14 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Camera, Loader2, User } from "lucide-react"
+import { Camera, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { ProgressLoader, ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { ApiError } from "@/lib/api-client"
 import {
   fetchProfile,
@@ -186,9 +187,10 @@ export default function UserProfilePage() {
 
   if (!isHydrated || !token) {
     return (
-      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center text-sm text-muted-foreground">
-        Loading...
-      </div>
+      <ProgressLoaderScreen
+        className="min-h-[calc(100vh-3.5rem)]"
+        label="Loading…"
+      />
     )
   }
 
@@ -223,9 +225,8 @@ export default function UserProfilePage() {
       <Card>
         <CardContent className="p-6 sm:p-8">
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading profile...
+            <div className="flex flex-col items-center justify-center py-16">
+              <ProgressLoader size="lg" label="Loading profile…" />
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -385,7 +386,7 @@ export default function UserProfilePage() {
                 <Button type="submit" disabled={isSaving}>
                   {isSaving ? (
                     <>
-                      <Loader2 className="size-4 animate-spin" />
+                      <ProgressLoader size="sm" />
                       Saving...
                     </>
                   ) : (

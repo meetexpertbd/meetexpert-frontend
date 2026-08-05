@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { useGet } from "@/hooks/use-get"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
@@ -125,7 +125,7 @@ export default function ExpertsPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {isLoading ? (
-          <ExpertsGridSkeleton />
+          <ProgressLoaderScreen label="Loading experts…" />
         ) : isError ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
             <p className="font-medium text-foreground">Could not load experts</p>
@@ -217,22 +217,5 @@ function ExpertCard({ expert }: { expert: ExpertItem }) {
         </Button>
       </CardFooter>
     </Card>
-  )
-}
-
-function ExpertsGridSkeleton() {
-  return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <Card key={i} className="overflow-hidden">
-          <Skeleton className="aspect-4/3 w-full rounded-none" />
-          <CardContent className="space-y-2 p-4">
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-4 w-full" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
   )
 }

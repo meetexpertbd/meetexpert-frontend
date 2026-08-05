@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { ProgressLoader } from "@/components/ui/progress-loader"
 import { ApiError } from "@/lib/api-client"
 import {
   checkEmail,
@@ -259,7 +260,14 @@ function LoginPageContent() {
                 </div>
               </div>
               <Button type="submit" className="h-10 w-full" disabled={isLoading || !value.trim()}>
-                {isLoading ? "Checking..." : "Continue"}
+                {isLoading ? (
+                  <>
+                    <ProgressLoader size="sm" />
+                    Checking...
+                  </>
+                ) : (
+                  "Continue"
+                )}
               </Button>
             </form>
           )}
@@ -309,7 +317,14 @@ function LoginPageContent() {
                 className="h-10 w-full"
                 disabled={isLoading || password.length < 6}
               >
-                {isLoading ? "Signing in..." : "Sign in"}
+                {isLoading ? (
+                  <>
+                    <ProgressLoader size="sm" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign in"
+                )}
               </Button>
               <button
                 type="button"
@@ -343,7 +358,14 @@ function LoginPageContent() {
                   className="h-10 w-full"
                   disabled={isLoading || otp.length < 4}
                 >
-                  {isLoading ? "Verifying..." : "Verify code"}
+                  {isLoading ? (
+                    <>
+                      <ProgressLoader size="sm" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify code"
+                  )}
                 </Button>
               </form>
               <p className="mt-4 text-center text-sm text-muted-foreground">
@@ -414,7 +436,14 @@ function LoginPageContent() {
                 className="h-10 w-full"
                 disabled={isLoading || password.length < 6 || password !== passwordConfirmation}
               >
-                {isLoading ? "Updating..." : "Update password"}
+                {isLoading ? (
+                  <>
+                    <ProgressLoader size="sm" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update password"
+                )}
               </Button>
               <button
                 type="button"

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { ProgressLoader } from "@/components/ui/progress-loader"
 import { ApiError } from "@/lib/api-client"
 import {
   completeRegistration,
@@ -163,7 +164,14 @@ function VerifyPageContent() {
                   className="h-10 w-full"
                   disabled={isLoading || code.length < 4}
                 >
-                  {isLoading ? "Verifying..." : "Verify code"}
+                  {isLoading ? (
+                    <>
+                      <ProgressLoader size="sm" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify code"
+                  )}
                 </Button>
               </form>
 
@@ -243,7 +251,14 @@ function VerifyPageContent() {
                   password !== passwordConfirmation
                 }
               >
-                {isLoading ? "Creating account..." : "Create account"}
+                {isLoading ? (
+                  <>
+                    <ProgressLoader size="sm" />
+                    Creating account...
+                  </>
+                ) : (
+                  "Create account"
+                )}
               </Button>
             </form>
           )}

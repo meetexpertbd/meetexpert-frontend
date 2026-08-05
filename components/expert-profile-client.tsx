@@ -44,6 +44,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer"
+import { ProgressLoader } from "@/components/ui/progress-loader"
 import { fetchExpertAvailableSlots, createBooking, type ExpertAvailableSlot } from "@/lib/expert-api"
 import type { ExpertDetail } from "@/lib/expert-detail-data"
 import { ApiError } from "@/lib/api-client"
@@ -453,9 +454,9 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
           </div>
         </div>
       ) : slotsLoading ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          Loading available slots…
-        </p>
+        <div className="flex flex-col items-center justify-center py-8">
+          <ProgressLoader size="md" label="Loading available slots…" />
+        </div>
       ) : slotsError ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{slotsError}</p>
       ) : (
@@ -579,7 +580,12 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
               onClick={() => void handleConfirmBooking()}
             >
               {bookingLoading
-                ? "Booking…"
+                ? (
+                  <>
+                    <ProgressLoader size="sm" />
+                    Booking…
+                  </>
+                )
                 : !token && isHydrated
                   ? "Log in to book"
                   : "Confirm booking"}
@@ -1076,9 +1082,9 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                         </div>
                       </div>
                     ) : slotsLoading ? (
-                      <p className="py-8 text-center text-sm text-muted-foreground">
-                        Loading available slots…
-                      </p>
+                      <div className="flex flex-col items-center justify-center py-8">
+                        <ProgressLoader size="md" label="Loading available slots…" />
+                      </div>
                     ) : slotsError ? (
                       <p className="py-8 text-center text-sm text-muted-foreground">{slotsError}</p>
                     ) : (
@@ -1158,7 +1164,12 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                             onClick={() => void handleConfirmBooking()}
                           >
                             {bookingLoading
-                              ? "Booking…"
+                              ? (
+                                <>
+                                  <ProgressLoader size="sm" />
+                                  Booking…
+                                </>
+                              )
                               : !token && isHydrated
                                 ? "Log in to book"
                                 : "Confirm booking"}

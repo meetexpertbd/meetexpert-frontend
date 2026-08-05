@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import {
-  Loader2, CheckCircle2, Clock, XCircle,
+  CheckCircle2, Clock, XCircle,
   Pencil, Save, X, Plus, Trash2,
 } from "lucide-react"
 
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ProgressLoader, ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { useGet, useMutation, useTaxonomy } from "@/hooks"
 import { updateExpertApplication } from "@/lib/expert-api"
 import type {
@@ -65,11 +66,7 @@ export default function ApplicationPage() {
   const application = data?.data
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <ProgressLoaderScreen label="Loading application…" />
   }
 
   if (isError || !application) {
@@ -381,7 +378,7 @@ function ApplicationForm({
                 <Label>Category</Label>
                 {taxLoading ? (
                   <div className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" /> Loading…
+                    <ProgressLoader size="sm" /> Loading…
                   </div>
                 ) : (
                   <Select value={form.categoryId} onChange={(e) => set("categoryId", e.target.value)} required>
@@ -540,7 +537,7 @@ function ApplicationForm({
 
         <div className="flex justify-end">
           <Button type="submit" disabled={isLoading} className="gap-1">
-            {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {isLoading ? <ProgressLoader size="sm" /> : <Save className="size-4" />}
             Save Changes
           </Button>
         </div>

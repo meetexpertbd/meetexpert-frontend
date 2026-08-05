@@ -9,7 +9,6 @@ import {
   GraduationCap,
   ChevronLeft,
   ChevronRight,
-  Loader2,
   Plus,
   Trash2,
 } from "lucide-react"
@@ -19,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ProgressLoader, ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { useMutation } from "@/hooks"
 import { submitExpertApplication } from "@/lib/expert-api"
@@ -162,8 +162,8 @@ export default function BecomeExpertApplyPage() {
 
   if (!isHydrated) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <main className="min-h-screen">
+        <ProgressLoaderScreen className="min-h-screen" label="Loading…" />
       </main>
     )
   }
@@ -317,7 +317,7 @@ export default function BecomeExpertApplyPage() {
                   <Label>Category</Label>
                   {taxLoading ? (
                     <div className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" /> Loading…
+                      <ProgressLoader size="sm" /> Loading…
                     </div>
                   ) : (
                     <Select
@@ -621,7 +621,7 @@ export default function BecomeExpertApplyPage() {
               </Button>
             ) : (
               <Button type="submit" disabled={isLoading} className="gap-1">
-                {isLoading && <Loader2 className="size-4 animate-spin" />}
+                {isLoading && <ProgressLoader size="sm" />}
                 Submit Application
               </Button>
             )}

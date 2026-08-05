@@ -3,6 +3,7 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
+import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { fetchProfile, toAuthUser } from "@/lib/auth-api"
 import { useAuthStore } from "@/store/auth-store"
 
@@ -42,9 +43,10 @@ export default function DashboardLayout({
 
   if (!isHydrated || !token) {
     return (
-      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center text-sm text-muted-foreground">
-        Loading...
-      </div>
+      <ProgressLoaderScreen
+        className="min-h-[calc(100vh-3.5rem)]"
+        label="Loading…"
+      />
     )
   }
 

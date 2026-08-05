@@ -5,7 +5,6 @@ import Link from "next/link"
 import {
   Calendar,
   Clock,
-  Loader2,
   Mail,
   Phone,
   RefreshCw,
@@ -15,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { resolveAvatarUrl } from "@/lib/auth-api"
 import {
   fetchExpertBookings,
@@ -329,9 +329,7 @@ export default function BookingsPage() {
       </div>
 
       {loading ? (
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
+        <ProgressLoaderScreen label="Loading bookings…" />
       ) : error ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">

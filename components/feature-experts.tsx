@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { ProgressLoader } from "@/components/ui/progress-loader"
 import { useGet } from "@/hooks/use-get"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
@@ -147,28 +147,9 @@ export function FeatureExperts() {
             style={{ scrollSnapType: "x mandatory" }}
           >
             {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  data-expert-card
-                  className="h-105 w-65 shrink-0 sm:w-70"
-                  style={{ scrollSnapAlign: "start" }}
-                >
-                  <Card className="flex h-full flex-col overflow-hidden">
-                    <Skeleton className="h-44 w-full shrink-0 rounded-none" />
-                    <CardContent className="flex flex-1 flex-col gap-2 p-4">
-                      <Skeleton className="h-5 w-20" />
-                      <Skeleton className="h-5 w-3/4" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-5/6" />
-                      <Skeleton className="mt-auto h-3 w-24" />
-                    </CardContent>
-                    <div className="border-t border-border p-4">
-                      <Skeleton className="h-9 w-full" />
-                    </div>
-                  </Card>
-                </div>
-              ))
+              <div className="flex w-full items-center justify-center py-16">
+                <ProgressLoader size="lg" label="Loading experts…" />
+              </div>
             ) : filtered.length === 0 ? (
               <div className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-border py-12 text-center">
                 <Search className="size-10 text-muted-foreground" />

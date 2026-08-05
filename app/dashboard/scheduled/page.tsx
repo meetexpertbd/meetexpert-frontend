@@ -1,11 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Plus, Trash2, Save, Info } from "lucide-react"
+import { Plus, Trash2, Save, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
+import { ProgressLoader, ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { useMutation } from "@/hooks"
 import {
   emptyAvailabilityDays,
@@ -227,11 +228,7 @@ export default function ScheduledPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <ProgressLoaderScreen label="Loading schedule…" />
   }
 
   return (
@@ -272,7 +269,7 @@ export default function ScheduledPage() {
             className="shrink-0"
           >
             {savingPrice ? (
-              <Loader2 className="size-4 animate-spin" />
+              <ProgressLoader size="sm" />
             ) : (
               <Save className="size-4" />
             )}
@@ -296,7 +293,7 @@ export default function ScheduledPage() {
         </div>
         <Button onClick={handleSave} disabled={!token || saving} className="shrink-0">
           {saving ? (
-            <Loader2 className="size-4 animate-spin" />
+            <ProgressLoader size="sm" />
           ) : (
             <Save className="size-4" />
           )}
