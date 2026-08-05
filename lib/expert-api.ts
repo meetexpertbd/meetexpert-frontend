@@ -136,6 +136,7 @@ export type BookingEntity = {
   expert?: BookingExpert | null
   user?: BookingUser | null
   meeting?: unknown
+  meeting_joins?: MeetingJoins | null
   created_at?: string
   updated_at?: string
 }
@@ -218,6 +219,23 @@ export type AgoraMeetingCredentials = {
   uid: string | number
 }
 
+export type MeetingJoinStatus = "joined" | "not_joined"
+
+export type MeetingJoinParty = {
+  status: MeetingJoinStatus
+  joined_at: string | null
+}
+
+export type MeetingJoins = {
+  user: MeetingJoinParty
+  expert: MeetingJoinParty
+}
+
+export type BookingMeetingPayload = {
+  credentials: AgoraMeetingCredentials | null
+  meeting_joins: MeetingJoins | null
+}
+
 function pickString(obj: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = obj[key]
@@ -227,17 +245,51 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | null
   return null
 }
 
+function meetingPayloadRoot(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object") return null
+  const obj = raw as Record<string, unknown>
+  if (obj.data && typeof obj.data === "object") {
+    return obj.data as Record<string, unknown>
+  }
+  if (obj.meeting && typeof obj.meeting === "object") {
+    return obj.meeting as Record<string, unknown>
+  }
+  return obj
+}
+
+function normalizeJoinParty(raw: unknown): MeetingJoinParty {
+  if (!raw || typeof raw !== "object") {
+    return { status: "not_joined", joined_at: null }
+  }
+  const obj = raw as Record<string, unknown>
+  const status =
+    obj.status === "joined" || obj.status === "not_joined"
+      ? obj.status
+      : "not_joined"
+  const joinedAt =
+    typeof obj.joined_at === "string" && obj.joined_at.trim()
+      ? obj.joined_at
+      : null
+  return { status, joined_at: joinedAt }
+}
+
+export function normalizeMeetingJoins(raw: unknown): MeetingJoins | null {
+  const root = meetingPayloadRoot(raw)
+  if (!root) return null
+  const joins = root.meeting_joins
+  if (!joins || typeof joins !== "object") return null
+  const obj = joins as Record<string, unknown>
+  return {
+    user: normalizeJoinParty(obj.user),
+    expert: normalizeJoinParty(obj.expert),
+  }
+}
+
 export function normalizeMeetingCredentials(
   raw: unknown
 ): AgoraMeetingCredentials | null {
-  if (!raw || typeof raw !== "object") return null
-  const obj = raw as Record<string, unknown>
-  const nested =
-    obj.data && typeof obj.data === "object"
-      ? (obj.data as Record<string, unknown>)
-      : obj.meeting && typeof obj.meeting === "object"
-        ? (obj.meeting as Record<string, unknown>)
-        : obj
+  const nested = meetingPayloadRoot(raw)
+  if (!nested) return null
 
   const appId =
     pickString(nested, ["app_id", "appId", "agora_app_id"]) ??
@@ -269,6 +321,13 @@ export function normalizeMeetingCredentials(
     channel,
     token,
     uid,
+  }
+}
+
+export function normalizeBookingMeeting(raw: unknown): BookingMeetingPayload {
+  return {
+    credentials: normalizeMeetingCredentials(raw),
+    meeting_joins: normalizeMeetingJoins(raw),
   }
 }
 

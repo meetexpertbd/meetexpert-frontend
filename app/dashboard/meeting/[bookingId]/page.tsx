@@ -18,7 +18,9 @@ import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { ApiError } from "@/lib/api-client"
 import {
   fetchBookingMeeting,
+  normalizeBookingMeeting,
   normalizeMeetingCredentials,
+  type MeetingJoins,
 } from "@/lib/expert-api"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
@@ -57,6 +59,43 @@ type AgoraScreenTrack = {
   on: (event: string, handler: () => void) => void
 }
 
+function formatJoinedAt(value: string | null): string | null {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+}
+
+function JoinStatusPill({
+  label,
+  party,
+}: {
+  label: string
+  party: { status: string; joined_at: string | null } | null | undefined
+}) {
+  const joined = party?.status === "joined"
+  const time = formatJoinedAt(party?.joined_at ?? null)
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs",
+        joined
+          ? "bg-emerald-600/15 text-emerald-700 dark:text-emerald-400"
+          : "bg-muted text-muted-foreground"
+      )}
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          joined ? "bg-emerald-600" : "bg-muted-foreground/50"
+        )}
+      />
+      {label}
+      {joined ? (time ? ` · ${time}` : " · Joined") : " · Waiting"}
+    </span>
+  )
+}
+
 export default function MeetingPage() {
   const params = useParams<{ bookingId: string }>()
   const router = useRouter()
@@ -75,6 +114,7 @@ export default function MeetingPage() {
   const [remoteUid, setRemoteUid] = React.useState<string | number | null>(null)
   const [sharing, setSharing] = React.useState(false)
   const [remoteSharing, setRemoteSharing] = React.useState(false)
+  const [meetingJoins, setMeetingJoins] = React.useState<MeetingJoins | null>(null)
 
   const localRef = React.useRef<HTMLDivElement>(null)
   const remoteRef = React.useRef<HTMLDivElement>(null)
@@ -134,6 +174,32 @@ export default function MeetingPage() {
     }
   }, [status])
 
+  // Refresh join status while in the room
+  React.useEffect(() => {
+    if (status !== "ready" || !token || !bookingId) return
+
+    let cancelled = false
+
+    async function refreshJoins() {
+      try {
+        const res = await fetchBookingMeeting(token!, bookingId)
+        const joins = normalizeBookingMeeting(res.data ?? res).meeting_joins
+        if (!cancelled && joins) setMeetingJoins(joins)
+      } catch {
+        // ignore poll errors
+      }
+    }
+
+    const id = window.setInterval(() => {
+      void refreshJoins()
+    }, 15000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [status, token, bookingId])
+
   React.useEffect(() => {
     if (!mounted || !isHydrated) return
     if (!token) {
@@ -156,9 +222,13 @@ export default function MeetingPage() {
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default
 
         const res = await fetchBookingMeeting(token!, bookingId)
-        const credentials = normalizeMeetingCredentials(res.data ?? res)
+        const payload = normalizeBookingMeeting(res.data ?? res)
+        const credentials = payload.credentials
         if (!credentials) {
           throw new Error("Meeting credentials are incomplete.")
+        }
+        if (!cancelled && payload.meeting_joins) {
+          setMeetingJoins(payload.meeting_joins)
         }
 
         if (cancelled) return
@@ -363,6 +433,20 @@ export default function MeetingPage() {
     }
   }
 
+  const isExpert = user?.user_type === "expert"
+  const otherPartyJoined =
+    meetingJoins == null
+      ? null
+      : isExpert
+        ? meetingJoins.user.status === "joined"
+        : meetingJoins.expert.status === "joined"
+  const waitingLabel =
+    otherPartyJoined === false
+      ? isExpert
+        ? "Waiting for the user…"
+        : "Waiting for the expert…"
+      : "Waiting for the other participant…"
+
   if (!mounted || !isHydrated || status === "loading") {
     return (
       <ProgressLoaderScreen
@@ -403,6 +487,12 @@ export default function MeetingPage() {
           <h1 className="text-base font-semibold text-foreground">
             {user?.name ? `${user.name}'s meeting` : "Live meeting"}
           </h1>
+          {meetingJoins ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <JoinStatusPill label="User" party={meetingJoins.user} />
+              <JoinStatusPill label="Expert" party={meetingJoins.expert} />
+            </div>
+          ) : null}
         </div>
         <Button variant="outline" size="sm" asChild>
           <Link href="/dashboard/bookings">Bookings</Link>
@@ -440,7 +530,7 @@ export default function MeetingPage() {
             {!remoteUid && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                 <Video className="size-8" />
-                <p className="text-sm">Waiting for the other participant…</p>
+                <p className="text-sm">{waitingLabel}</p>
               </div>
             )}
             <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white">
