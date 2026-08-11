@@ -17,11 +17,11 @@ import {
   Bell,
   Menu,
   X,
-  User,
   ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { logoutRequest } from "@/lib/auth-api"
+import { UserAvatar } from "@/components/user-avatar"
 import { useAuthStore } from "@/store/auth-store"
 
 type NavItem = {
@@ -124,7 +124,6 @@ export function DashboardSidebar() {
   const userType = user?.user_type === "expert" ? "expert" : "user"
   const displayName = user?.name ?? "Account"
   const displayEmail = user?.email ?? ""
-  const avatarUrl = user?.avatar ?? null
 
   const sections = React.useMemo(() => {
     return navSections
@@ -200,31 +199,12 @@ export function DashboardSidebar() {
 
         <div className="flex flex-1 flex-col overflow-y-auto p-4">
           <div className="flex flex-col items-center border-b border-border pb-4">
-            <div className="relative">
-              <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border-2 border-primary bg-muted ring-2 ring-primary/20">
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarUrl}
-                    alt={displayName}
-                    className="size-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none"
-                      e.currentTarget.parentElement
-                        ?.querySelector("[data-avatar-fallback]")
-                        ?.classList.remove("hidden")
-                    }}
-                  />
-                ) : null}
-                <User
-                  data-avatar-fallback
-                  className={cn(
-                    "size-7 text-muted-foreground",
-                    avatarUrl && "hidden"
-                  )}
-                />
-              </div>
-            </div>
+            <UserAvatar
+              name={displayName}
+              src={user?.avatar}
+              size="lg"
+              className="border-2 border-primary ring-2 ring-primary/20"
+            />
             <p className="mt-2 font-semibold text-foreground">{displayName}</p>
             <p className="text-xs text-muted-foreground">
               {displayEmail || (userType === "expert" ? "Expert" : "User")}

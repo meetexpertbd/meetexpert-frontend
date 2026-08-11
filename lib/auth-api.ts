@@ -16,6 +16,7 @@ export type UserProfileDetails = {
   date_of_birth?: string | null
   phone?: string | null
   avatar?: string | null
+  avatar_url?: string | null
   present_address?: string | null
   permanent_address?: string | null
   district?: string | null
@@ -54,20 +55,44 @@ export function resolveAvatarUrl(avatar?: string | null) {
   return `${assetBase}/storage/${avatar}`
 }
 
-export function getProfileAvatar(user: UserProfile | null | undefined) {
-  if (!user) return null
-  const details = user.profile
-  const raw =
-    details?.avatar ||
-    (details && "avatar_url" in details
-      ? String((details as { avatar_url?: string | null }).avatar_url ?? "")
-      : "") ||
-    user.avatar ||
-    null
-  return resolveAvatarUrl(raw || null)
+type AvatarSource = {
+  avatar?: string | null
+  avatar_url?: string | null
+  profile?: { avatar?: string | null; avatar_url?: string | null } | null
+  expert_profile?: { avatar?: string | null; avatar_url?: string | null } | null
 }
 
-export function toAuthUser(user: UserProfile): AuthUser {
+function firstAvatar(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    if (value?.trim()) return value.trim()
+  }
+  return null
+}
+
+export function getProfileAvatar(user: AvatarSource | null | undefined) {
+  if (!user) return null
+  return resolveAvatarUrl(
+    firstAvatar(
+      user.avatar_url,
+      user.avatar,
+      user.profile?.avatar_url,
+      user.profile?.avatar,
+      user.expert_profile?.avatar_url,
+      user.expert_profile?.avatar
+    )
+  )
+}
+
+export function getNameInitials(name?: string | null) {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+}
+
+export function toAuthUser(
+  user: AuthUser & AvatarSource & { email?: string }
+): AuthUser {
   return {
     id: user.id,
     name: user.name,
@@ -100,7 +125,7 @@ export type CheckEmailAction = "login" | "register"
 type AuthPayload = {
   token?: string
   access_token?: string
-  user?: AuthUser
+  user?: AuthUser & AvatarSource
 }
 
 function getToken(data: AuthPayload | null | undefined) {
@@ -121,7 +146,7 @@ export async function loginWithPassword(email: string, password: string) {
   return {
     ...res,
     token: getToken(res.data),
-    user: res.data?.user ?? null,
+    user: res.data?.user ? toAuthUser(res.data.user) : null,
   }
 }
 
@@ -146,7 +171,7 @@ export async function completeRegistration(payload: {
   return {
     ...res,
     token: getToken(res.data),
-    user: res.data?.user ?? null,
+    user: res.data?.user ? toAuthUser(res.data.user) : null,
   }
 }
 

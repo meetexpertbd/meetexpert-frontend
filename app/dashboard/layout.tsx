@@ -4,7 +4,6 @@ import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
-import { fetchProfile, toAuthUser } from "@/lib/auth-api"
 import { useAuthStore } from "@/store/auth-store"
 
 export default function DashboardLayout({
@@ -17,22 +16,11 @@ export default function DashboardLayout({
   const token = useAuthStore((s) => s.token)
   const user = useAuthStore((s) => s.user)
   const isHydrated = useAuthStore((s) => s.isHydrated)
-  const setUser = useAuthStore((s) => s.setUser)
-
   React.useEffect(() => {
     if (isHydrated && !token) {
       router.replace("/login")
     }
   }, [isHydrated, token, router])
-
-  React.useEffect(() => {
-    if (!isHydrated || !token) return
-    void fetchProfile(token)
-      .then((user) => {
-        setUser(toAuthUser(user))
-      })
-      .catch(() => {})
-  }, [isHydrated, token, setUser])
 
   React.useEffect(() => {
     if (!isHydrated || !token) return

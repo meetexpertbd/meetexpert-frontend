@@ -7,6 +7,7 @@ import { Menu, Moon, Sun, User, LayoutDashboard, LogOut, X, LogIn } from "lucide
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { logoutRequest } from "@/lib/auth-api"
+import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -81,12 +82,13 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
               <Button
                 variant="outline"
                 size="sm"
+                className="gap-2 pl-1"
                 onClick={() => setMenuOpen((o) => !o)}
                 aria-expanded={menuOpen}
                 aria-haspopup="true"
               >
-                <User className="size-4" />
-                <span className="ml-1.5">{user.name.length > 7 ? user.name.slice(0, 7) + "..." : user.name || "Account"}</span>
+                <UserAvatar name={user.name} src={user.avatar} size="xs" />
+                <span className="max-w-24 truncate">{user.name || "Account"}</span>
               </Button>
               {menuOpen && (
                 <div
@@ -142,15 +144,20 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
             </Button>
           )}
         </div>
-        <button
-          type="button"
-          className="flex size-10 items-center justify-center rounded-md text-foreground hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:hidden"
-          onClick={() => setMobileOpen((o) => !o)}
-          aria-expanded={mobileOpen}
-          aria-label="Toggle menu"
-        >
-          {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-        </button>
+        <div className="flex items-center gap-1.5 sm:hidden">
+          {isLoggedIn && user ? (
+            <UserAvatar name={user.name} src={user.avatar} size="xs" />
+          ) : null}
+          <button
+            type="button"
+            className="flex size-10 items-center justify-center rounded-md text-foreground hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-expanded={mobileOpen}
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
+        </div>
       </nav>
       {mobileOpen && (
         <div className="border-t border-border bg-background sm:hidden">
@@ -174,8 +181,12 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
                 {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                 <span className="ml-2">Theme</span>
               </Button>
-              {isLoggedIn ? (
+              {isLoggedIn && user ? (
                 <>
+                  <div className="flex items-center gap-2 px-3 py-1">
+                    <UserAvatar name={user.name} src={user.avatar} size="sm" />
+                    <span className="truncate text-sm font-medium">{user.name}</span>
+                  </div>
                   <Link href="/profile" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                     Profile
                   </Link>

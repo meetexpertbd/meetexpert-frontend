@@ -19,6 +19,9 @@ import {
   Star,
   Video,
   Check,
+  Mail,
+  Facebook,
+  Linkedin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -194,6 +197,45 @@ function useIsDesktop(breakpoint = "(min-width: 768px)") {
   return isDesktop
 }
 
+function getExpertProfileUrl(slug: string) {
+  if (typeof window === "undefined") return `/experts/${slug}`
+  return `${window.location.origin}/experts/${slug}`
+}
+
+async function copyToClipboard(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // fall through to execCommand
+    }
+  }
+
+  try {
+    const el = document.createElement("textarea")
+    el.value = text
+    el.setAttribute("readonly", "")
+    el.style.position = "fixed"
+    el.style.left = "-9999px"
+    document.body.appendChild(el)
+    el.select()
+    const ok = document.execCommand("copy")
+    document.body.removeChild(el)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.727-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  )
+}
+
 function mapApiSlots(date: string, slots: ExpertAvailableSlot[]): BookableSlot[] {
   const d = new Date(`${date}T00:00:00`)
   const dayOfWeek = d.getDay()
@@ -240,6 +282,15 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
   const [reviewsLoading, setReviewsLoading] = React.useState(false)
   const [reviewsError, setReviewsError] = React.useState<string | null>(null)
   const [reviewsLoaded, setReviewsLoaded] = React.useState(false)
+  const [shareOpen, setShareOpen] = React.useState(false)
+  const [copied, setCopied] = React.useState(false)
+  const copyResetRef = React.useRef<number | null>(null)
+
+  const [profileUrl, setProfileUrl] = React.useState(`/experts/${expert.slug}`)
+  const shareTitle = expert.name
+  const shareText = expert.headline
+    ? `${expert.name} — ${expert.headline}`
+    : `Book a session with ${expert.name} on Meet Expert`
 
   const avgReview =
     reviews.length > 0
@@ -451,10 +502,124 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     }
   }
 
-  const share = () => {
-    const url = typeof window !== "undefined" ? window.location.href : ""
-    void navigator.clipboard?.writeText(url).catch(() => {})
-  }
+  React.useEffect(() => {
+    setProfileUrl(getExpertProfileUrl(expert.slug))
+  }, [expert.slug])
+
+  React.useEffect(() => {
+    return () => {
+      if (copyResetRef.current) window.clearTimeout(copyResetRef.current)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (shareOpen) return
+    setCopied(false)
+    if (copyResetRef.current) {
+      window.clearTimeout(copyResetRef.current)
+      copyResetRef.current = null
+    }
+  }, [shareOpen])
+
+  const markCopied = React.useCallback(() => {
+    setCopied(true)
+    if (copyResetRef.current) window.clearTimeout(copyResetRef.current)
+    copyResetRef.current = window.setTimeout(() => setCopied(false), 2000)
+  }, [])
+
+  const copyProfileUrl = React.useCallback(async () => {
+    const ok = await copyToClipboard(profileUrl)
+    if (ok) markCopied()
+  }, [profileUrl, markCopied])
+
+  const share = React.useCallback(async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: profileUrl,
+        })
+        return
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return
+    }
+    setShareOpen(true)
+  }, [profileUrl, shareText, shareTitle])
+
+  const shareTargets = [
+    {
+      label: "WhatsApp",
+      href: `https://wa.me/?text=${encodeURIComponent(`${shareText}\n${profileUrl}`)}`,
+      className: "bg-[#25D366]/10 text-[#128C7E] hover:bg-[#25D366]/20",
+      icon: MessageSquare,
+    },
+    {
+      label: "Facebook",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`,
+      className: "bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20",
+      icon: Facebook,
+    },
+    {
+      label: "X",
+      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(profileUrl)}`,
+      className: "bg-foreground/5 text-foreground hover:bg-foreground/10",
+      icon: XIcon,
+    },
+    {
+      label: "LinkedIn",
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`,
+      className: "bg-[#0A66C2]/10 text-[#0A66C2] hover:bg-[#0A66C2]/20",
+      icon: Linkedin,
+    },
+    {
+      label: "Email",
+      href: `mailto:?subject=${encodeURIComponent(shareTitle)}&body=${encodeURIComponent(`${shareText}\n\n${profileUrl}`)}`,
+      className: "bg-muted text-foreground hover:bg-muted/80",
+      icon: Mail,
+    },
+  ]
+
+  const sharePanelBody = (
+    <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden">
+      <div className="grid grid-cols-3 gap-2">
+        {shareTargets.map((target) => {
+          const Icon = target.icon
+          return (
+            <a
+              key={target.label}
+              href={target.href}
+              target={target.label === "Email" ? undefined : "_blank"}
+              rel={target.label === "Email" ? undefined : "noopener noreferrer"}
+              className={cn(
+                "flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl px-1 py-3 text-center text-xs font-medium transition-colors",
+                target.className
+              )}
+              onClick={() => setShareOpen(false)}
+            >
+              <Icon className="size-5 shrink-0" />
+              <span className="w-full truncate">{target.label}</span>
+            </a>
+          )
+        })}
+      </div>
+      <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-2 sm:flex-row sm:items-center">
+        <p className="min-w-0 flex-1 break-all px-2 py-1 text-xs text-muted-foreground">
+          {profileUrl}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant={copied ? "default" : "outline"}
+          className="w-full min-w-28 shrink-0 sm:w-auto"
+          onClick={() => void copyProfileUrl()}
+        >
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+      </div>
+    </div>
+  )
 
   const bookingPanelBody = (
     <div className="space-y-5">
@@ -504,7 +669,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
             </p>
           )}
 
-          <div className="flex gap-3 overflow-x-auto pt-5 pb-1 scrollbar-none md:justify-between md:overflow-visible md:px-0">
+          <div className="flex gap-3 overflow-x-auto pt-5 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-between md:overflow-visible md:px-0">
             {bookingDates.map((date) => {
               const d = parseDateKey(date)
               const isSelected = date === selectedDate
@@ -631,7 +796,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
   )
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <div className="border-b border-border bg-muted/20">
         <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <Link
@@ -723,7 +888,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  onClick={share}
+                  onClick={() => void share()}
                   aria-label="Share profile"
                 >
                   <Share2 className="size-4" />
@@ -778,7 +943,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
         </div>
 
         <div className="mt-8">
-          <div className="flex gap-2 overflow-x-auto border-b border-border pb-px scrollbar-none">
+          <div className="flex gap-2 overflow-x-auto border-b border-border pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -1126,6 +1291,41 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
           </DrawerContent>
         </Drawer>
       )}
+
+      {isDesktop ? (
+        <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+          <DialogContent className="max-h-[90dvh] w-full max-w-[min(28rem,calc(100%-2rem))] overflow-x-hidden overflow-y-auto p-4 sm:p-6">
+            <DialogHeader className="min-w-0 pr-8">
+              <DialogTitle className="truncate">Share {expert.name}</DialogTitle>
+              <DialogDescription>Send this expert profile to someone else.</DialogDescription>
+            </DialogHeader>
+            {sharePanelBody}
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <Drawer open={shareOpen} onOpenChange={setShareOpen}>
+          <DrawerContent className="overflow-x-hidden data-[vaul-drawer-direction=bottom]:h-auto data-[vaul-drawer-direction=bottom]:max-h-[90dvh]">
+            <DrawerHeader className="min-w-0 text-left">
+              <DrawerTitle className="truncate">Share {expert.name}</DrawerTitle>
+              <DrawerDescription>Send this expert profile to someone else.</DrawerDescription>
+            </DrawerHeader>
+            <div className="min-w-0 overflow-x-hidden overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+              {sharePanelBody}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      )}
+
+      {copied ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 left-1/2 z-80 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm font-medium text-background shadow-lg sm:bottom-6"
+        >
+          <Check className="size-4 shrink-0" />
+          Profile URL copied
+        </div>
+      ) : null}
     </div>
   )
 }
