@@ -8,6 +8,7 @@ import {
   Mail,
   Phone,
   RefreshCw,
+  Star,
   User,
   Video,
 } from "lucide-react"
@@ -15,11 +16,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
+import { BookingReviewDialog, RatingStars } from "@/components/booking-review-dialog"
 import { resolveAvatarUrl } from "@/lib/auth-api"
 import {
   fetchExpertBookings,
   fetchUserBookings,
   type BookingEntity,
+  type BookingReview,
 } from "@/lib/expert-api"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
@@ -52,6 +55,16 @@ function formatDate(value: string | null | undefined): string {
 function formatPrice(value: number | null | undefined): string | null {
   if (value == null || !Number.isFinite(value)) return null
   return `${value.toLocaleString("en-BD")} BDT`
+}
+
+function sessionEnded(booking: BookingEntity): boolean {
+  if (!booking.scheduled_date || !booking.end_time) return false
+  const end = new Date(`${booking.scheduled_date}T${booking.end_time}`)
+  return !Number.isNaN(end.getTime()) && end.getTime() <= Date.now()
+}
+
+function canReviewBooking(booking: BookingEntity): boolean {
+  return booking.status.toLowerCase() === "confirmed" && sessionEnded(booking)
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -104,10 +117,18 @@ function BookingAvatar({
   )
 }
 
-function UserBookingCard({ booking }: { booking: BookingEntity }) {
+function UserBookingCard({
+  booking,
+  onReview,
+}: {
+  booking: BookingEntity
+  onReview: (booking: BookingEntity, readOnly: boolean) => void
+}) {
   const expert = booking.expert
   const price = formatPrice(expert?.slot_price)
   const expertHref = expert?.id != null ? `/experts/${expert.id}` : null
+  const review = booking.review ?? null
+  const reviewable = canReviewBooking(booking)
 
   return (
     <Card className="border-border">
@@ -158,6 +179,11 @@ function UserBookingCard({ booking }: { booking: BookingEntity }) {
             </span>
             {price && <span>{price}</span>}
           </div>
+          {review && (
+            <div className="mt-2 flex justify-center sm:justify-start">
+              <RatingStars value={review.rating} size="sm" readOnly />
+            </div>
+          )}
           {booking.notes && (
             <p className="mt-2 text-sm text-muted-foreground">
               Note: {booking.notes}
@@ -165,25 +191,46 @@ function UserBookingCard({ booking }: { booking: BookingEntity }) {
           )}
         </div>
 
-        {booking.status.toLowerCase() === "confirmed" ? (
-          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
-            <Link href={`/dashboard/meeting/${booking.id}`}>
-              <Video className="size-4" />
-              Join
-            </Link>
-          </Button>
-        ) : expertHref ? (
-          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
-            <Link href={expertHref}>View expert</Link>
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          {booking.status.toLowerCase() === "confirmed" && !sessionEnded(booking) ? (
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link href={`/dashboard/meeting/${booking.id}`}>
+                <Video className="size-4" />
+                Join
+              </Link>
+            </Button>
+          ) : expertHref && !reviewable && !review ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={expertHref}>View expert</Link>
+            </Button>
+          ) : null}
+          {reviewable && (
+            <Button
+              type="button"
+              variant={review ? "outline" : "default"}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => onReview(booking, false)}
+            >
+              <Star className="size-4" />
+              {review ? "Edit review" : "Write review"}
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
 }
 
-function ExpertBookingCard({ booking }: { booking: BookingEntity }) {
+function ExpertBookingCard({
+  booking,
+  onReview,
+}: {
+  booking: BookingEntity
+  onReview: (booking: BookingEntity, readOnly: boolean) => void
+}) {
   const client = booking.user
+  const review = booking.review ?? null
 
   return (
     <Card className="border-border">
@@ -223,6 +270,11 @@ function ExpertBookingCard({ booking }: { booking: BookingEntity }) {
               {formatTime(booking.start_time)} – {formatTime(booking.end_time)}
             </span>
           </div>
+          {review && (
+            <div className="mt-2 flex justify-center sm:justify-start">
+              <RatingStars value={review.rating} size="sm" readOnly />
+            </div>
+          )}
           {booking.notes && (
             <p className="mt-2 text-sm text-muted-foreground">
               Note: {booking.notes}
@@ -230,14 +282,28 @@ function ExpertBookingCard({ booking }: { booking: BookingEntity }) {
           )}
         </div>
 
-        {booking.status.toLowerCase() === "confirmed" ? (
-          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
-            <Link href={`/dashboard/meeting/${booking.id}`}>
-              <Video className="size-4" />
-              Join
-            </Link>
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          {booking.status.toLowerCase() === "confirmed" && !sessionEnded(booking) ? (
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link href={`/dashboard/meeting/${booking.id}`}>
+                <Video className="size-4" />
+                Join
+              </Link>
+            </Button>
+          ) : null}
+          {review && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => onReview(booking, true)}
+            >
+              <Star className="size-4" />
+              View review
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
@@ -253,6 +319,8 @@ export default function BookingsPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [total, setTotal] = React.useState(0)
+  const [reviewTarget, setReviewTarget] = React.useState<BookingEntity | null>(null)
+  const [reviewReadOnly, setReviewReadOnly] = React.useState(false)
 
   const load = React.useCallback(async () => {
     if (!token) {
@@ -373,12 +441,49 @@ export default function BookingsPage() {
         <div className="space-y-3">
           {bookings.map((booking) =>
             isExpert ? (
-              <ExpertBookingCard key={booking.id} booking={booking} />
+              <ExpertBookingCard
+                key={booking.id}
+                booking={booking}
+                onReview={(item, readOnly) => {
+                  setReviewTarget(item)
+                  setReviewReadOnly(readOnly)
+                }}
+              />
             ) : (
-              <UserBookingCard key={booking.id} booking={booking} />
+              <UserBookingCard
+                key={booking.id}
+                booking={booking}
+                onReview={(item, readOnly) => {
+                  setReviewTarget(item)
+                  setReviewReadOnly(readOnly)
+                }}
+              />
             )
           )}
         </div>
+      )}
+
+      {token && reviewTarget && (
+        <BookingReviewDialog
+          open={Boolean(reviewTarget)}
+          onOpenChange={(open) => {
+            if (!open) setReviewTarget(null)
+          }}
+          token={token}
+          bookingId={reviewTarget.id}
+          expertName={
+            isExpert
+              ? reviewTarget.user?.name
+              : reviewTarget.expert?.name
+          }
+          review={reviewTarget.review ?? null}
+          readOnly={reviewReadOnly}
+          onSaved={(review: BookingReview) => {
+            setBookings((prev) =>
+              prev.map((b) => (b.id === reviewTarget.id ? { ...b, review } : b))
+            )
+          }}
+        />
       )}
     </div>
   )

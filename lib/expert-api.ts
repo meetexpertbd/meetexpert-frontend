@@ -125,6 +125,22 @@ export type BookingUser = {
   avatar_url?: string | null
 }
 
+export type BookingReview = {
+  id: number
+  booking_id: number
+  rating: number
+  comment: string | null
+  user?: { id: number; name: string } | null
+  expert?: { id: number; name: string } | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type BookingReviewInput = {
+  rating: number
+  comment?: string | null
+}
+
 export type BookingEntity = {
   id: number
   status: string
@@ -135,6 +151,7 @@ export type BookingEntity = {
   availability_slot_id: number
   expert?: BookingExpert | null
   user?: BookingUser | null
+  review?: BookingReview | null
   meeting?: unknown
   meeting_joins?: MeetingJoins | null
   created_at?: string
@@ -210,6 +227,30 @@ export async function fetchExpertBookings(
     ...res,
     data: normalizeBookingsPayload(res.data),
   }
+}
+
+export function bookingReviewUrl(bookingId: number | string) {
+  return `${BOOKINGS_API_URL}/${bookingId}/review`
+}
+
+export async function fetchBookingReview(token: string, bookingId: number | string) {
+  return get<ApiEnvelope<BookingReview>>(bookingReviewUrl(bookingId), { token })
+}
+
+export async function createBookingReview(
+  token: string,
+  bookingId: number | string,
+  input: BookingReviewInput
+) {
+  return post<ApiEnvelope<BookingReview>>(bookingReviewUrl(bookingId), input, { token })
+}
+
+export async function updateBookingReview(
+  token: string,
+  bookingId: number | string,
+  input: BookingReviewInput
+) {
+  return put<ApiEnvelope<BookingReview>>(bookingReviewUrl(bookingId), input, { token })
 }
 
 export type AgoraMeetingCredentials = {
