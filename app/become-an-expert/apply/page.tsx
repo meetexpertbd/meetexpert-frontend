@@ -77,7 +77,9 @@ const initialForm: FormData = {
 export default function BecomeExpertApplyPage() {
   const router = useRouter()
   const token = useAuthStore((s) => s.token)
+  const user = useAuthStore((s) => s.user)
   const isHydrated = useAuthStore((s) => s.isHydrated)
+  const isExpert = user?.user_type === "expert"
 
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<FormData>(initialForm)
@@ -101,8 +103,13 @@ export default function BecomeExpertApplyPage() {
   )
 
   React.useEffect(() => {
-    if (isHydrated && !token) router.replace("/login")
-  }, [isHydrated, token, router])
+    if (!isHydrated) return
+    if (isExpert) {
+      router.replace("/dashboard")
+      return
+    }
+    if (!token) router.replace("/login")
+  }, [isHydrated, token, isExpert, router])
 
   const set = (key: keyof FormData, value: unknown) => {
     setForm((p) => {
@@ -160,7 +167,7 @@ export default function BecomeExpertApplyPage() {
     })
   }
 
-  if (!isHydrated) {
+  if (!isHydrated || isExpert) {
     return (
       <main className="min-h-screen">
         <ProgressLoaderScreen className="min-h-screen" label="Loading…" />

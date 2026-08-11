@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
+import { useAuth } from "@/components/auth-provider"
 
 
 const trustStats = [
@@ -122,6 +123,9 @@ function HeroSlider() {
 }
 
 export function Hero() {
+  const { user } = useAuth()
+  const isExpert = user?.user_type === "expert"
+
   return (
     <section className="relative overflow-hidden border-b border-border bg-linear-to-b from-background to-muted/20">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
@@ -145,11 +149,13 @@ export function Hero() {
                 <Search className="size-4" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/become-an-expert">Become an Expert
-                <UserPlus className="size-4" />
-                </Link>
-              </Button>
+              {!isExpert && (
+                <Button size="lg" variant="outline" asChild>
+                  <Link href="/become-an-expert">Become an Expert
+                  <UserPlus className="size-4" />
+                  </Link>
+                </Button>
+              )}
             </div>
             
             <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">

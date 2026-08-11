@@ -27,6 +27,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CATEGORIES_GRID } from "@/lib/expert-categories"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/store/auth-store"
+import { useRouter } from "next/navigation"
 
 const WHY_ITEMS = [
   { icon: DollarSign, title: "Earn Online", desc: "Set your own consultation fee." ,iconClass: "text-white bg-amber-500" },
@@ -69,6 +71,19 @@ const categoryIcons: Record<string, React.ElementType> = {
 }
 
 export default function BecomeAnExpertPage() {
+  const router = useRouter()
+  const user = useAuthStore((s) => s.user)
+  const isHydrated = useAuthStore((s) => s.isHydrated)
+  const isExpert = user?.user_type === "expert"
+
+  React.useEffect(() => {
+    if (isHydrated && isExpert) router.replace("/dashboard")
+  }, [isHydrated, isExpert, router])
+
+  if (isHydrated && isExpert) {
+    return <main className="min-h-screen bg-background" />
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <section className="relative overflow-hidden border-b border-border bg-linear-to-b from-background to-muted/20">

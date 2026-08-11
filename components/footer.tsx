@@ -1,8 +1,11 @@
+"use client"
+
 import Link from "next/link"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Button, Input } from "./ui"
 import { Facebook, Instagram, Twitter } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 const quickLinks = [
   { href: "/", label: "Home" },
@@ -46,6 +49,12 @@ function FooterLink({
 }
 
 function Footer({ className, ...props }: React.ComponentProps<"footer">) {
+  const { user } = useAuth()
+  const isExpert = user?.user_type === "expert"
+  const visibleProductLinks = productLinks.filter(
+    (link) => !(isExpert && link.href === "/become-an-expert")
+  )
+
   return (
     <footer
       className={cn(
@@ -83,7 +92,7 @@ function Footer({ className, ...props }: React.ComponentProps<"footer">) {
           <div>
             <h3 className="text-sm font-semibold text-foreground">Product</h3>
             <ul className="mt-4 flex flex-col gap-3">
-              {productLinks.map(({ href, label }) => (
+              {visibleProductLinks.map(({ href, label }) => (
                 <li key={href}>
                   <FooterLink href={href}>{label}</FooterLink>
                 </li>

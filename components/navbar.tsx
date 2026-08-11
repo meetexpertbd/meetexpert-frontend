@@ -26,6 +26,10 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const isExpert = user?.user_type === "expert"
+  const visibleNavLinks = navLinks.filter(
+    (link) => !(isExpert && link.href === "/become-an-expert")
+  )
   React.useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node))
@@ -55,7 +59,7 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
           Meet Expert
         </Link>
         <div className="hidden items-center gap-1 sm:flex sm:gap-2">
-          {navLinks.map(({ href, label }) => (
+          {visibleNavLinks.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
@@ -162,7 +166,7 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
       {mobileOpen && (
         <div className="border-t border-border bg-background sm:hidden">
           <div className="flex flex-col gap-1 px-4 py-3">
-            {navLinks.map(({ href, label }) => (
+            {visibleNavLinks.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
