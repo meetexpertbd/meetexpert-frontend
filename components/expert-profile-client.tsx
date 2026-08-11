@@ -58,13 +58,12 @@ import { ApiError } from "@/lib/api-client"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
 
-type TabId = "info" | "experience" | "reviews" | "slots"
+type TabId = "info" | "experience" | "reviews"
 
 const TABS = [
   { id: "info" as const, label: "Info", icon: Info },
   { id: "experience" as const, label: "Experience", icon: Briefcase },
   { id: "reviews" as const, label: "Reviews", icon: MessageSquare },
-  { id: "slots" as const, label: "Slots", icon: Calendar },
 ]
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -297,30 +296,13 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     )
   }, [slotsByDate, selectedDate])
 
-  const slotsByDay = React.useMemo(() => {
-    const groups: { dayOfWeek: number; label: string; slots: BookableSlot[] }[] = []
-    for (let dow = 0; dow < 7; dow++) {
-      const daySlots = slots
-        .filter((s) => s.dayOfWeek === dow)
-        .slice()
-        .sort(compareSlots)
-      if (daySlots.length === 0) continue
-      groups.push({
-        dayOfWeek: dow,
-        label: DAY_LABELS[dow],
-        slots: daySlots,
-      })
-    }
-    return groups
-  }, [slots])
-
   const selectedSlot = React.useMemo(
     () => slots.find((s) => s.id === selectedSlotId) ?? null,
     [slots, selectedSlotId]
   )
 
   React.useEffect(() => {
-    if ((!bookingOpen && tab !== "slots") || slotsLoaded) return
+    if (!bookingOpen || slotsLoaded) return
 
     let cancelled = false
     const dates = upcomingDates(14)
@@ -359,7 +341,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     return () => {
       cancelled = true
     }
-  }, [bookingOpen, tab, expert.id, enabledDays, slotsLoaded])
+  }, [bookingOpen, expert.id, enabledDays, slotsLoaded])
 
   const loadReviews = React.useCallback(
     async (page: number, append = false) => {
@@ -1111,183 +1093,6 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
               </div>
             )}
 
-            {tab === "slots" && (
-              <div className="space-y-6">
-                {enabledDays.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Calendar className="size-5 text-primary" />
-                        Weekly availability
-                      </CardTitle>
-                      <CardDescription>
-                        Regular schedule{expert.price ? ` · ${expert.price} per session` : ""}
-                        {expert.duration ? ` · ${expert.duration}` : ""}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {enabledDays.map((day) => (
-                        <div
-                          key={day.day_of_week}
-                          className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-3 last:border-0 last:pb-0"
-                        >
-                          <p className="text-sm font-medium text-foreground">
-                            {DAY_LABELS[day.day_of_week]}
-                          </p>
-                          <div className="flex flex-wrap justify-end gap-1.5">
-                            {day.slots.map((slot, i) => (
-                              <Badge key={`${slot.start}-${i}`} variant="secondary" className="font-normal">
-                                {formatTime(slot.start)} – {formatTime(slot.end)}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Video className="size-5 text-primary" />
-                      Book a session
-                    </CardTitle>
-                    <CardDescription>
-                      Upcoming open times for the next two weeks
-                      {expert.price ? ` · ${expert.price}` : ""}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {bookingState === "done" ? (
-                      <div className="space-y-4 py-4 text-center">
-                        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                          <BadgeCheck className="size-6" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-lg font-semibold text-foreground">Booked!</p>
-                          <p className="text-sm text-muted-foreground">
-                            Your session is confirmed for{" "}
-                            <span className="font-medium text-foreground">{bookedSlotLabel}</span>.
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-                          <Button type="button" variant="outline" asChild>
-                            <Link href="/dashboard/bookings">View bookings</Link>
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              setBookingState("idle")
-                              setSelectedSlotId(null)
-                              setBookedSlotLabel("")
-                              setBookingError(null)
-                            }}
-                          >
-                            Book another slot
-                          </Button>
-                        </div>
-                      </div>
-                    ) : slotsLoading ? (
-                      <div className="flex flex-col items-center justify-center py-8">
-                        <ProgressLoader size="md" label="Loading available slots…" />
-                      </div>
-                    ) : slotsError ? (
-                      <p className="py-8 text-center text-sm text-muted-foreground">{slotsError}</p>
-                    ) : (
-                      <>
-                        {!token && isHydrated && (
-                          <p className="mb-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                            <Link href={loginHref} className="font-medium text-primary hover:underline">
-                              Log in
-                            </Link>{" "}
-                            to confirm a booking.
-                          </p>
-                        )}
-
-                        <div className="space-y-5">
-                          {slotsByDay.map((group) => (
-                            <div key={group.dayOfWeek}>
-                              <p className="mb-2 text-sm font-semibold text-foreground">
-                                {group.label}
-                              </p>
-                              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                {group.slots.map((s) => {
-                                  const isSelected = s.id === selectedSlotId
-                                  return (
-                                    <button
-                                      key={s.id}
-                                      type="button"
-                                      disabled={!s.available || bookingLoading}
-                                      onClick={() => {
-                                        setSelectedSlotId(s.id)
-                                        setBookingError(null)
-                                      }}
-                                      className={cn(
-                                        "flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-colors",
-                                        s.available
-                                          ? "bg-card hover:bg-muted/30 hover:border-primary/30"
-                                          : "cursor-not-allowed bg-muted/20 opacity-60",
-                                        isSelected ? "border-primary bg-primary/5" : "border-border"
-                                      )}
-                                    >
-                                      <span className="text-sm font-medium text-foreground">
-                                        {formatTime(s.start)}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {s.available ? s.time : "Booked"}
-                                        {" · "}
-                                        {s.date}
-                                      </span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {bookingError && (
-                          <p className="mt-4 text-sm text-destructive">{bookingError}</p>
-                        )}
-
-                        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="sm:flex-1"
-                            disabled={bookingLoading}
-                            onClick={() => {
-                              setSelectedSlotId(null)
-                              setBookingError(null)
-                            }}
-                          >
-                            Clear
-                          </Button>
-                          <Button
-                            type="button"
-                            className="gap-2 sm:flex-1"
-                            disabled={!selectedSlot || !selectedSlot.available || bookingLoading}
-                            onClick={() => void handleConfirmBooking()}
-                          >
-                            {bookingLoading
-                              ? (
-                                <>
-                                  <ProgressLoader size="sm" />
-                                  Booking…
-                                </>
-                              )
-                              : !token && isHydrated
-                                ? "Log in to book"
-                                : "Confirm booking"}
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
           </div>
         </div>
       </div>
