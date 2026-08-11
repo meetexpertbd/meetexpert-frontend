@@ -126,7 +126,7 @@ function UserBookingCard({
 }) {
   const expert = booking.expert
   const price = formatPrice(expert?.slot_price)
-  const expertHref = expert?.id != null ? `/experts/${expert.id}` : null
+  const expertHref = expert?.slug ? `/experts/${expert.slug}` : null
   const review = booking.review ?? null
   const reviewable = canReviewBooking(booking)
 

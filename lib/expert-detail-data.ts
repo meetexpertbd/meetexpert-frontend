@@ -1,5 +1,5 @@
 import {
-  fetchExpertById,
+  fetchExpertBySlug,
   normalizeAvailabilityDays,
   parseSlotPrice,
   type AvailabilityDay,
@@ -207,9 +207,9 @@ export function mapExpertToDetail(expert: ExpertDetailEntity): ExpertDetail {
   }
 }
 
-export async function getExpertDetail(id: string): Promise<ExpertDetail | null> {
+export async function getExpertDetail(slug: string): Promise<ExpertDetail | null> {
   try {
-    const res = await fetchExpertById(id)
+    const res = await fetchExpertBySlug(slug)
     if (!res?.data) return null
     return mapExpertToDetail(res.data)
   } catch {

@@ -85,16 +85,18 @@ export async function fetchExperts(params?: ExpertsListParams) {
   )
 }
 
-export async function fetchExpertById(id: number | string) {
-  return get<ApiEnvelope<ExpertDetailEntity>>(`${EXPERTS_API_URL}/${id}`)
+export async function fetchExpertBySlug(slug: string) {
+  return get<ApiEnvelope<ExpertDetailEntity>>(
+    `${EXPERTS_API_URL}/${encodeURIComponent(slug)}`
+  )
 }
 
 export async function fetchExpertAvailableSlots(
-  userId: number | string,
+  slug: string,
   date: string
 ) {
   return get<ApiEnvelope<ExpertAvailableSlotsData>>(
-    `${EXPERTS_API_URL}/${userId}/available-slots?date=${encodeURIComponent(date)}`
+    `${EXPERTS_API_URL}/${encodeURIComponent(slug)}/available-slots?date=${encodeURIComponent(date)}`
   )
 }
 
@@ -110,11 +112,11 @@ export type ExpertReviewsData = {
 }
 
 export async function fetchExpertReviews(
-  userId: number | string,
+  slug: string,
   page = 1
 ) {
   return get<ApiEnvelope<ExpertReviewsData>>(
-    `${EXPERTS_API_URL}/${userId}/reviews?page=${page}`
+    `${EXPERTS_API_URL}/${encodeURIComponent(slug)}/reviews?page=${page}`
   )
 }
 
@@ -132,6 +134,7 @@ export type CreateBookingInput = {
 export type BookingExpert = {
   id: number
   name: string
+  slug?: string | null
   professional_headline?: string | null
   avatar_url?: string | null
   slot_price?: number | null

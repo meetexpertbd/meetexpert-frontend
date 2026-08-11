@@ -209,7 +209,7 @@ export function FeatureExperts() {
                     </CardContent>
                     <CardFooter className="mt-auto shrink-0 border-t border-border p-4">
                       <Button size="sm" className="w-full gap-1.5" asChild>
-                        <Link href={`/experts/${expert.id}`}>
+                        <Link href={`/experts/${expert.slug}`}>
                           <Video className="size-4" />
                           Book Consultation
                         </Link>

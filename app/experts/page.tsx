@@ -210,7 +210,7 @@ function ExpertCard({ expert }: { expert: ExpertItem }) {
       </CardContent>
       <CardFooter className="flex gap-2 border-t border-border p-4">
         <Button size="sm" className="flex-1 gap-1.5" asChild>
-          <Link href={`/experts/${expert.id}`}>
+          <Link href={`/experts/${expert.slug}`}>
             <Video className="size-4" />
             Book Consultation
           </Link>

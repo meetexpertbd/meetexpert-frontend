@@ -313,7 +313,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     void Promise.all(
       dates.map(async (date) => {
         try {
-          const res = await fetchExpertAvailableSlots(expert.id, date)
+          const res = await fetchExpertAvailableSlots(expert.slug, date)
           return mapApiSlots(date, res.data?.slots ?? [])
         } catch {
           return [] as BookableSlot[]
@@ -341,14 +341,14 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     return () => {
       cancelled = true
     }
-  }, [bookingOpen, expert.id, enabledDays, slotsLoaded])
+  }, [bookingOpen, expert.slug, enabledDays, slotsLoaded])
 
   const loadReviews = React.useCallback(
     async (page: number, append = false) => {
       setReviewsLoading(true)
       setReviewsError(null)
       try {
-        const res = await fetchExpertReviews(expert.id, page)
+        const res = await fetchExpertReviews(expert.slug, page)
         const list = res.data?.reviews ?? []
         const pagination = res.data?.pagination
         setReviews((prev) => (append ? [...prev, ...list] : list))
@@ -362,7 +362,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
         setReviewsLoading(false)
       }
     },
-    [expert.id]
+    [expert.slug]
   )
 
   React.useEffect(() => {
@@ -400,7 +400,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     setBookingOpen(true)
   }
 
-  const loginHref = `/login?redirect=${encodeURIComponent(`/experts/${expert.id}`)}`
+  const loginHref = `/login?redirect=${encodeURIComponent(`/experts/${expert.slug}`)}`
 
   const handleConfirmBooking = async () => {
     if (!selectedSlot || !selectedSlot.available) return
