@@ -252,6 +252,68 @@ export async function fetchExpertBookings(
   }
 }
 
+export const EXPERT_DASHBOARD_URL = "/expert/dashboard"
+
+export type ExpertDashboardProfile = {
+  id: number
+  name: string
+  slug?: string | null
+  expert_code?: string | null
+  professional_headline?: string | null
+  avatar_url?: string | null
+  status?: string | null
+  slot_price?: number | null
+}
+
+export type ExpertDashboardStats = {
+  total_bookings: number
+  upcoming_bookings: number
+  completed_bookings: number
+  cancelled_bookings: number
+  todays_bookings: number
+  total_reviews: number
+  average_rating: number | null
+  estimated_earnings: number | null
+}
+
+export type ExpertDashboardData = {
+  profile: ExpertDashboardProfile
+  stats: ExpertDashboardStats
+  upcoming_bookings: BookingEntity[]
+  recent_reviews: BookingReview[]
+}
+
+function asList<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === "object" && "data" in value && Array.isArray((value as { data: unknown }).data)) {
+    return (value as { data: T[] }).data
+  }
+  return []
+}
+
+export async function fetchExpertDashboard(token: string) {
+  const res = await get<ApiEnvelope<ExpertDashboardData>>(EXPERT_DASHBOARD_URL, { token })
+  const raw = res.data
+  return {
+    ...res,
+    data: {
+      profile: raw?.profile ?? ({} as ExpertDashboardProfile),
+      stats: raw?.stats ?? {
+        total_bookings: 0,
+        upcoming_bookings: 0,
+        completed_bookings: 0,
+        cancelled_bookings: 0,
+        todays_bookings: 0,
+        total_reviews: 0,
+        average_rating: null,
+        estimated_earnings: null,
+      },
+      upcoming_bookings: asList<BookingEntity>(raw?.upcoming_bookings),
+      recent_reviews: asList<BookingReview>(raw?.recent_reviews),
+    } satisfies ExpertDashboardData,
+  }
+}
+
 export function bookingReviewUrl(bookingId: number | string) {
   return `${BOOKINGS_API_URL}/${bookingId}/review`
 }
