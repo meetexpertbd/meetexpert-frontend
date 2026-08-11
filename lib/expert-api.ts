@@ -98,6 +98,26 @@ export async function fetchExpertAvailableSlots(
   )
 }
 
+export type ExpertReviewsData = {
+  total_reviews: number
+  reviews: BookingReview[]
+  pagination: {
+    current_page: number
+    per_page: number
+    last_page: number
+    total: number
+  }
+}
+
+export async function fetchExpertReviews(
+  userId: number | string,
+  page = 1
+) {
+  return get<ApiEnvelope<ExpertReviewsData>>(
+    `${EXPERTS_API_URL}/${userId}/reviews?page=${page}`
+  )
+}
+
 export const BOOKINGS_API_URL = "/bookings"
 export const USER_BOOKINGS_API_URL = "/user/bookings"
 export const EXPERT_BOOKINGS_API_URL = "/expert/bookings"
@@ -130,7 +150,7 @@ export type BookingReview = {
   booking_id: number
   rating: number
   comment: string | null
-  user?: { id: number; name: string } | null
+  user?: { id: number; name: string; avatar_url?: string | null } | null
   expert?: { id: number; name: string } | null
   created_at?: string
   updated_at?: string

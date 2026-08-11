@@ -45,7 +45,14 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { ProgressLoader } from "@/components/ui/progress-loader"
-import { fetchExpertAvailableSlots, createBooking, type ExpertAvailableSlot } from "@/lib/expert-api"
+import { resolveAvatarUrl } from "@/lib/auth-api"
+import {
+  fetchExpertAvailableSlots,
+  fetchExpertReviews,
+  createBooking,
+  type BookingReview,
+  type ExpertAvailableSlot,
+} from "@/lib/expert-api"
 import type { ExpertDetail } from "@/lib/expert-detail-data"
 import { ApiError } from "@/lib/api-client"
 import { useAuthStore } from "@/store/auth-store"
@@ -88,6 +95,17 @@ function formatTime(value: string): string {
   const ampm = h >= 12 ? "PM" : "AM"
   h = h % 12 || 12
   return `${h}:${min} ${ampm}`
+}
+
+function formatReviewDate(value: string | null | undefined): string {
+  if (!value) return ""
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
 }
 
 function toDateKey(d: Date): string {
@@ -216,10 +234,17 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
   const [slotsLoaded, setSlotsLoaded] = React.useState(false)
   const [bookingLoading, setBookingLoading] = React.useState(false)
   const [bookingError, setBookingError] = React.useState<string | null>(null)
+  const [reviews, setReviews] = React.useState<BookingReview[]>([])
+  const [reviewsTotal, setReviewsTotal] = React.useState(0)
+  const [reviewsPage, setReviewsPage] = React.useState(1)
+  const [reviewsLastPage, setReviewsLastPage] = React.useState(1)
+  const [reviewsLoading, setReviewsLoading] = React.useState(false)
+  const [reviewsError, setReviewsError] = React.useState<string | null>(null)
+  const [reviewsLoaded, setReviewsLoaded] = React.useState(false)
 
   const avgReview =
-    expert.reviews.length > 0
-      ? expert.reviews.reduce((a, r) => a + r.rating, 0) / expert.reviews.length
+    reviews.length > 0
+      ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length
       : expert.rating
 
   const enabledDays = React.useMemo(
@@ -335,6 +360,33 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
       cancelled = true
     }
   }, [bookingOpen, tab, expert.id, enabledDays, slotsLoaded])
+
+  const loadReviews = React.useCallback(
+    async (page: number, append = false) => {
+      setReviewsLoading(true)
+      setReviewsError(null)
+      try {
+        const res = await fetchExpertReviews(expert.id, page)
+        const list = res.data?.reviews ?? []
+        const pagination = res.data?.pagination
+        setReviews((prev) => (append ? [...prev, ...list] : list))
+        setReviewsTotal(res.data?.total_reviews ?? pagination?.total ?? list.length)
+        setReviewsPage(pagination?.current_page ?? page)
+        setReviewsLastPage(pagination?.last_page ?? 1)
+        setReviewsLoaded(true)
+      } catch {
+        setReviewsError("Could not load reviews.")
+      } finally {
+        setReviewsLoading(false)
+      }
+    },
+    [expert.id]
+  )
+
+  React.useEffect(() => {
+    if (reviewsLoaded) return
+    void loadReviews(1)
+  }, [reviewsLoaded, loadReviews])
 
   React.useEffect(() => {
     if (!bookingOpen || slotsLoading || bookingDates.length === 0) return
@@ -751,7 +803,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                 type="button"
                 onClick={() => setTab(id)}
                 className={cn(
-                  "flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                  "relative flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
                   tab === id
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -759,6 +811,11 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
               >
                 <Icon className="size-4 shrink-0" />
                 {label}
+                {id === "reviews" && reviewsLoaded && (
+                  <span className="absolute right-0 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                    {reviewsTotal > 99 ? "99+" : reviewsTotal}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -975,13 +1032,24 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
 
             {tab === "reviews" && (
               <div className="space-y-4">
-                {expert.reviews.length === 0 ? (
+                {reviewsLoading && !reviewsLoaded ? (
+                  <div className="flex justify-center py-10">
+                    <ProgressLoader label="Loading reviews…" />
+                  </div>
+                ) : reviewsError && reviews.length === 0 ? (
+                  <div className="space-y-3 text-center">
+                    <p className="text-sm text-muted-foreground">{reviewsError}</p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void loadReviews(1)}>
+                      Try again
+                    </Button>
+                  </div>
+                ) : reviews.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No reviews yet.</p>
                 ) : (
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm text-muted-foreground">
-                        Average from {expert.reviews.length} reviews
+                        {reviewsTotal} review{reviewsTotal === 1 ? "" : "s"}
                       </p>
                       <div className="flex items-center gap-2">
                         <Stars value={avgReview} />
@@ -989,16 +1057,55 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                       </div>
                     </div>
                     <Separator />
-                    {expert.reviews.map((r) => (
-                      <div key={r.id} className="rounded-lg border border-border bg-card p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="font-medium text-foreground">{r.author}</p>
-                          <Stars value={r.rating} />
+                    {reviews.map((r) => {
+                      const avatar = resolveAvatarUrl(r.user?.avatar_url)
+                      return (
+                        <div key={r.id} className="rounded-lg border border-border bg-card p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
+                                {avatar ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={avatar}
+                                    alt={r.user?.name ?? "Reviewer"}
+                                    className="size-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    {(r.user?.name ?? "U").slice(0, 1).toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-foreground">
+                                  {r.user?.name ?? "Client"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatReviewDate(r.created_at)}
+                                </p>
+                              </div>
+                            </div>
+                            <Stars value={r.rating} />
+                          </div>
+                          {r.comment && (
+                            <p className="mt-3 text-sm text-muted-foreground">{r.comment}</p>
+                          )}
                         </div>
-                        <p className="mt-2 text-sm text-muted-foreground">{r.comment}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">{r.date}</p>
+                      )
+                    })}
+                    {reviewsPage < reviewsLastPage && (
+                      <div className="flex justify-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={reviewsLoading}
+                          onClick={() => void loadReviews(reviewsPage + 1, true)}
+                        >
+                          {reviewsLoading ? "Loading…" : "Load more"}
+                        </Button>
                       </div>
-                    ))}
+                    )}
                   </>
                 )}
               </div>
