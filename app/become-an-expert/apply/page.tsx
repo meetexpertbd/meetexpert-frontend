@@ -280,13 +280,15 @@ export default function BecomeExpertApplyPage() {
                   <p className="text-xs text-muted-foreground">{form.languages.length} selected</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="registration_value">Registration / License Number</Label>
+                  <Label htmlFor="registration_value">
+                    Registration / License Number{" "}
+                    <span className="text-muted-foreground">(optional)</span>
+                  </Label>
                   <Input
                     id="registration_value"
                     value={form.registration_value}
                     onChange={(e) => set("registration_value", e.target.value)}
                     placeholder="e.g. BMDC-12345"
-                    required
                   />
                 </div>
                 <div className="space-y-2">

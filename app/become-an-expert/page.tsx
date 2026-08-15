@@ -42,8 +42,6 @@ const HOW_STEPS = [
   { num: 2, title: "Set Your Availability", desc: "Choose time slots for consultations.", icon: CalendarCheck ,iconClass: "text-white bg-amber-500" },
   { num: 3, title: "Get Bookings", desc: "Users will book sessions with you.", icon: Wallet ,iconClass: "text-white bg-blue-500" },
   { num: 4, title: "Join Video Call & Earn", desc: "Deliver consultations and get paid.", icon: Video ,iconClass: "text-white bg-green-500" },
-  { num: 3, title: "Get Bookings", desc: "Users will book sessions with you.", icon: Wallet, iconClass: "text-white bg-purple-500" },
-  { num: 4, title: "Join Video Call & Earn", desc: "Deliver consultations and get paid.", icon: Video, iconClass: "text-white bg-primary" },
 ]
 
 const REQUIREMENTS = [

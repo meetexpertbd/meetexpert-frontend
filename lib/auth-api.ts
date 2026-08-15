@@ -164,10 +164,10 @@ export async function completeRegistration(payload: {
   password: string
   password_confirmation: string
 }) {
-  const res = await post<ApiEnvelope<AuthPayload>>(
-    "/auth/register/complete",
-    payload
-  )
+  const res = await post<ApiEnvelope<AuthPayload>>("/auth/register/complete", {
+    ...payload,
+    registration_from: "web",
+  })
   return {
     ...res,
     token: getToken(res.data),
