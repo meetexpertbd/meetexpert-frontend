@@ -22,6 +22,9 @@ import {
   Mail,
   Facebook,
   Linkedin,
+  Lock,
+  RotateCcw,
+  LifeBuoy,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -52,12 +55,11 @@ import { resolveAvatarUrl } from "@/lib/auth-api"
 import {
   fetchExpertAvailableSlots,
   fetchExpertReviews,
-  createBooking,
   type BookingReview,
   type ExpertAvailableSlot,
 } from "@/lib/expert-api"
+import { buildCheckoutPath } from "@/lib/checkout"
 import type { ExpertDetail } from "@/lib/expert-detail-data"
-import { ApiError } from "@/lib/api-client"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
 
@@ -273,7 +275,6 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
   const [slotsLoading, setSlotsLoading] = React.useState(false)
   const [slotsError, setSlotsError] = React.useState<string | null>(null)
   const [slotsLoaded, setSlotsLoaded] = React.useState(false)
-  const [bookingLoading, setBookingLoading] = React.useState(false)
   const [bookingError, setBookingError] = React.useState<string | null>(null)
   const [reviews, setReviews] = React.useState<BookingReview[]>([])
   const [reviewsTotal, setReviewsTotal] = React.useState(0)
@@ -323,7 +324,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     }
 
     return pool.slice(start, start + 7)
-  }, [bookingOpen, slots, slotsLoaded])
+  }, [ slots, slotsLoaded])
 
   const slotsByDate = React.useMemo(() => {
     const map = new Map<string, BookableSlot[]>()
@@ -453,53 +454,33 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
 
   const loginHref = `/login?redirect=${encodeURIComponent(`/experts/${expert.slug}`)}`
 
-  const handleConfirmBooking = async () => {
-    if (!selectedSlot || !selectedSlot.available) return
+  const handleCheckout = () => {
+    if (!selectedSlot || !isSlotBookable(selectedSlot)) return
     setBookingError(null)
-
     if (!isHydrated) return
+
+    const path = buildCheckoutPath({
+      expertId: Number(expert.id),
+      expertSlug: expert.slug,
+      expertName: expert.name,
+      expertImage: expert.image,
+      headline: expert.headline || expert.subcategory,
+      availabilitySlotId: selectedSlot.slotId,
+      date: selectedSlot.date,
+      start: selectedSlot.start,
+      end: selectedSlot.end,
+      price: expert.price,
+      duration: expert.duration,
+      amount: expert.slotPrice,
+    })
+
     if (!token) {
-      router.push(loginHref)
+      router.push(`/login?redirect=${encodeURIComponent(path)}`)
       return
     }
 
-    setBookingLoading(true)
-    try {
-      await createBooking(token, {
-        expert_id: Number(expert.id),
-        availability_slot_id: selectedSlot.slotId,
-        date: selectedSlot.date,
-      })
-      setBookedSlotLabel(
-        `${DAY_LABELS[selectedSlot.dayOfWeek]} · ${formatTime(selectedSlot.start)} · ${selectedSlot.date}`
-      )
-      setBookingState("done")
-      setSlots((prev) =>
-        prev.map((s) =>
-          s.id === selectedSlot.id ? { ...s, available: false } : s
-        )
-      )
-      setSelectedSlotId(null)
-    } catch (e) {
-      let message = "Could not complete booking."
-      if (e instanceof ApiError) {
-        const body = e.body
-        if (body && typeof body === "object" && "errors" in body) {
-          const errors = (body as { errors?: Record<string, string[] | string> }).errors
-          const first = errors
-            ? Object.values(errors).flatMap((v) => (Array.isArray(v) ? v : [v]))[0]
-            : null
-          message = first || e.message
-        } else {
-          message = e.message
-        }
-      } else if (e instanceof Error) {
-        message = e.message
-      }
-      setBookingError(message)
-    } finally {
-      setBookingLoading(false)
-    }
+    setBookingOpen(false)
+    router.push(path)
   }
 
   React.useEffect(() => {
@@ -669,7 +650,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
             </p>
           )}
 
-          <div className="flex gap-3 overflow-x-auto pt-5 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-between md:overflow-visible md:px-0">
+          <div className="flex gap-1 overflow-x-auto pt-5 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-between md:overflow-visible md:px-0">
             {bookingDates.map((date) => {
               const d = parseDateKey(date)
               const isSelected = date === selectedDate
@@ -683,18 +664,18 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                     setSelectedSlotId(null)
                     setBookingError(null)
                   }}
-                  className="relative flex shrink-0 flex-col items-center gap-1.5"
+                  className="relative flex shrink-0 flex-col items-center gap-1"
                   aria-pressed={isSelected}
                   aria-label={`${DAY_LABELS[d.getDay()]} ${formatCircleDate(date)}`}
                 >
                   {isSelected && (
                     <span className="absolute -top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                      <Check className="size-3 stroke-[3]" />
+                      <Check className="size-3 stroke-3" />
                     </span>
                   )}
                   <span
                     className={cn(
-                      "flex size-[4.5rem] flex-col items-center justify-center rounded-full border text-center transition-colors",
+                      "flex size-18 flex-col items-center justify-center rounded-lg border text-center transition-colors",
                       isSelected
                         ? "border-primary bg-primary/10 text-foreground"
                         : hasSlots
@@ -719,36 +700,45 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                 No slots available for this day.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Available time slots">
                 {slotsForSelectedDate.map((s) => {
                   const isSelected = s.id === selectedSlotId
                   const bookable = isSlotBookable(s)
                   return (
-                    <button
+                    <label
                       key={s.id}
-                      type="button"
-                      disabled={!bookable || bookingLoading}
-                      onClick={() => {
-                        setSelectedSlotId(s.id)
-                        setBookingError(null)
-                      }}
                       className={cn(
-                        "min-w-[7.5rem] flex-1 rounded-xl border px-4 py-3 text-center transition-colors sm:flex-none",
+                        "flex min-w-20 flex-1 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors sm:flex-none",
                         bookable
                           ? "bg-card hover:border-primary/40 hover:bg-muted/30"
                           : "cursor-not-allowed bg-muted/20 opacity-60",
                         isSelected ? "border-primary bg-primary/5" : "border-border"
                       )}
                     >
-                      <span className="block text-sm font-semibold text-foreground">
-                        {formatTime(s.start)} – {formatTime(s.end)}
-                      </span>
-                      {!bookable && (
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          Booked
+                      <input
+                        type="radio"
+                        name="booking-slot"
+                        value={s.id}
+                        checked={isSelected}
+                        disabled={!bookable}
+                        onChange={() => {
+                          if (!bookable) return
+                          setSelectedSlotId(s.id)
+                          setBookingError(null)
+                        }}
+                        className="size-4 shrink-0 accent-primary disabled:cursor-not-allowed"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-foreground">
+                          {formatTime(s.start)} – {formatTime(s.end)}
                         </span>
-                      )}
-                    </button>
+                        {!bookable && (
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            Booked
+                          </span>
+                        )}
+                      </span>
+                    </label>
                   )
                 })}
               </div>
@@ -759,12 +749,21 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
             <p className="text-sm text-destructive">{bookingError}</p>
           )}
 
+          <div className="rounded-xl border border-border/70 bg-muted/30 p-4">
+            <p className="text-sm font-semibold text-foreground">Your consultation includes</p>
+            <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+              <li>✓ {expert.duration || "Private"} video call</li>
+              <li>✓ Direct access to {expert.name}</li>
+              <li>✓ Secure meeting room</li>
+              <li>✓ Booking saved in My Bookings</li>
+            </ul>
+          </div>
+
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               type="button"
               variant="outline"
               className="sm:flex-1"
-              disabled={bookingLoading}
               onClick={() => {
                 setSelectedSlotId(null)
                 setBookingError(null)
@@ -775,21 +774,20 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
             <Button
               type="button"
               className="gap-2 sm:flex-1"
-              disabled={!selectedSlot || !isSlotBookable(selectedSlot) || bookingLoading}
-              onClick={() => void handleConfirmBooking()}
+              disabled={!selectedSlot || !isSlotBookable(selectedSlot)}
+              onClick={handleCheckout}
             >
-              {bookingLoading
-                ? (
-                  <>
-                    <ProgressLoader size="sm" />
-                    Booking…
-                  </>
-                )
-                : !token && isHydrated
-                  ? "Log in to book"
-                  : "Confirm booking"}
+              {!token && isHydrated ? "Log in to checkout" : "Checkout"}
             </Button>
           </div>
+          <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1"><Lock className="size-3" /> Secure session</span>
+            <span className="inline-flex items-center gap-1"><ShieldCheck className="size-3" /> Reviewed expert</span>
+            <span className="inline-flex items-center gap-1"><RotateCcw className="size-3" /> Cancel from My Bookings</span>
+            <Link href="/contact" className="inline-flex items-center gap-1 hover:text-foreground">
+              <LifeBuoy className="size-3" /> Support
+            </Link>
+          </p>
         </>
       )}
     </div>
@@ -853,7 +851,22 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
               <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 {expert.name}
               </h1>
-              <p className="mt-1 text-sm text-muted-foreground">{expert.degreesLine}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{expert.headline || expert.degreesLine}</p>
+              {(avgReview > 0 || (expert.yearsExperience > 0) || expert.languages.length > 0) && (
+                <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground lg:justify-start">
+                  {avgReview > 0 && (
+                    <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                      <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                      {avgReview.toFixed(1)}
+                      {reviewsTotal > 0 ? ` · ${reviewsTotal} reviews` : ""}
+                    </span>
+                  )}
+                  {expert.yearsExperience > 0 && <span>{expert.yearsExperience}+ years</span>}
+                  {expert.languages.length > 0 && (
+                    <span>{expert.languages.slice(0, 4).join(" · ")}</span>
+                  )}
+                </p>
+              )}
 
               <div className="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
                 <div className="bg-card px-4 py-3 text-center sm:text-left">
@@ -882,7 +895,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
               )}
             </div>
 
-            <div className="flex w-full flex-col gap-4 border-t border-border pt-6 lg:w-72 lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+            <div className="sticky top-20 flex w-full flex-col gap-4 border-t border-border pt-6 lg:w-72 lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
               <div className="flex justify-end">
                 <Button
                   type="button"
@@ -922,6 +935,12 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                   )}
                 </div>
               )}
+
+              <ul className="space-y-1.5 text-xs text-muted-foreground">
+                <li>✓ Private video call</li>
+                <li>✓ Secure meeting room</li>
+                <li>✓ Saved in My Bookings</li>
+              </ul>
 
               <Button
                 size="lg"

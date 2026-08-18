@@ -100,7 +100,7 @@ function DottedBg() {
 
 function HowItWork() {
   return (
-    <section className="relative py-16 sm:py-20">
+    <section id="how-it-works" className="relative py-16 sm:py-20">
       <DottedBg />
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <p className="text-center text-sm font-medium text-primary">

@@ -42,8 +42,24 @@ const faqs = [
     a: "হ্যাঁ। কনসালটেশন এবং পার্সোনাল ডেটা এনক্রিপ্টেড ও সিকিউর রাখা হয়। আমরা আপনার তথ্য তৃতীয় পক্ষকে বিক্রি করি না। বিস্তারিত Privacy Policy-তে দেখুন।",
   },
   {
+    q: "এক্সপার্ট না এলে কী হবে? What if the expert doesn't show up?",
+    a: "যদি এক্সপার্ট সেশনে না আসেন, সাপোর্টে জানান। আমরা বুকিং স্ট্যাটাস দেখে রিফান্ড বা নতুন স্লট সাজাতে সাহায্য করি। If the expert misses the call, contact us from the Contact page and we will help resolve it.",
+  },
+  {
+    q: "ইন্টারনেট কেটে গেলে? What if my internet disconnects?",
+    a: "একই মিটিং লিংক থেকে আবার জয়েন করুন — সেশন শেষ না হওয়া পর্যন্ত রুম খোলা থাকে। Rejoin from My Bookings if the call drops.",
+  },
+  {
+    q: "সেশন রেকর্ড হয়? Are consultations recorded?",
+    a: "ভিডিও সেশন প্রাইভেট। আমরা কনসালটেশন রেকর্ড করে পাবলিক করি না। Sessions are private 1-to-1 video calls and are not published as recordings.",
+  },
+  {
+    q: "প্রাইভেসি কীভাবে রক্ষা হয়? How is my privacy protected?",
+    a: "আপনার প্রোফাইল ও বুকিং ডেটা সার্ভিস চালাতে ব্যবহার হয়, তৃতীয় পক্ষকে বিক্রি করা হয় না। বিস্তারিত Privacy Policy দেখুন।",
+  },
+  {
     q: "সাহায্য পেতে কোথায় যোগাযোগ করব? Where do I contact for help?",
-    a: "কোনো প্রশ্ন বা সমস্যা থাকলে Contact পেজ থেকে মেসেজ পাঠান অথবা support@expert.com-এ ইমেইল করুন। আমরা দ্রুত রিপ্লাই দেব।",
+    a: "Contact পেজ থেকে মেসেজ পাঠান। আমরা দ্রুত রিপ্লাই দেব।",
   },
 ]
 

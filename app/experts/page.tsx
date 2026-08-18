@@ -1,25 +1,31 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
-import { Search, Video } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
+import { ExpertCard } from "@/components/expert-card"
 import { useGet } from "@/hooks/use-get"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
-import { PLACEHOLDER_AVATAR, mapExpertToItem, type ExpertItem } from "@/lib/experts-data"
+import { FALLBACK_EXPERTS, asExpertList, mapExpertToItem } from "@/lib/experts-data"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
+import { CATEGORIES_GRID } from "@/lib/expert-categories"
 import { cn } from "@/lib/utils"
 
 type SortOption = "experience" | "name"
 
-export default function ExpertsPage() {
-  const [search, setSearch] = React.useState("")
-  const [categoryId, setCategoryId] = React.useState<number | null>(null)
+function ExpertsPageInner() {
+  const searchParams = useSearchParams()
+  const [search, setSearch] = React.useState(searchParams.get("q") ?? "")
+  const [categoryId, setCategoryId] = React.useState<number | null>(() => {
+    const raw = searchParams.get("category_id")
+    const n = raw ? Number(raw) : NaN
+    return Number.isFinite(n) ? n : null
+  })
   const [sortBy, setSortBy] = React.useState<SortOption>("experience")
   const { categories } = useTaxonomy()
 
@@ -30,42 +36,49 @@ export default function ExpertsPage() {
     return `${EXPERTS_API_URL}?${q.toString()}`
   }, [categoryId])
 
-  const { data, isLoading, isError, refetch } = useGet<ApiEnvelope<ExpertEntity[]>>(listUrl)
+  const { data, isLoading } = useGet<ApiEnvelope<ExpertEntity[]>>(listUrl)
 
-  const experts = React.useMemo(
-    () => (data?.data ?? []).map(mapExpertToItem),
-    [data]
-  )
+  const experts = React.useMemo(() => {
+    const list = asExpertList(data?.data).map(mapExpertToItem)
+    return list.length > 0 ? list : FALLBACK_EXPERTS
+  }, [data])
+
+  const categoryChips =
+    categories.length > 0
+      ? categories
+      : CATEGORIES_GRID.map((c, i) => ({ id: -(i + 1), name: c.label }))
 
   const filtered = React.useMemo(() => {
     let list = experts.filter((e) => {
       const q = search.trim().toLowerCase()
-      if (!q) return true
-      return (
+      const matchQ =
+        !q ||
         e.name.toLowerCase().includes(q) ||
         e.category.toLowerCase().includes(q) ||
         e.subcategory.toLowerCase().includes(q) ||
         e.headline.toLowerCase().includes(q) ||
         e.bio.toLowerCase().includes(q) ||
         e.skills.some((s) => s.toLowerCase().includes(q))
-      )
+      const matchCat =
+        categoryId == null ||
+        e.categoryId === categoryId ||
+        (categoryId < 0 && e.category === categoryChips.find((c) => c.id === categoryId)?.name)
+      return matchQ && matchCat
     })
     list = [...list].sort((a, b) => {
       if (sortBy === "name") return a.name.localeCompare(b.name)
       return b.yearsExperience - a.yearsExperience
     })
     return list
-  }, [experts, search, sortBy])
+  }, [experts, search, sortBy, categoryId, categoryChips])
 
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-card/50">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Find an Expert
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Find an Expert</h1>
           <p className="mt-1 text-muted-foreground">
-            Book verified professionals for video consultation.
+            Book a private video session with reviewed professionals.
           </p>
 
           <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -73,47 +86,44 @@ export default function ExpertsPage() {
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search by name, category, skills..."
+                placeholder="Search lawyers, study abroad experts, career mentors..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-10 pl-9"
               />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Sort:</span>
-              <div className="flex rounded-lg border border-border bg-background p-0.5">
-                {(["experience", "name"] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setSortBy(s)}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                      sortBy === s
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {s === "experience" ? "Experience" : "Name"}
-                  </button>
-                ))}
-              </div>
+            <div className="flex rounded-lg border border-border bg-background p-0.5">
+              {(["experience", "name"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSortBy(s)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                    sortBy === s
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {s === "experience" ? "Experience" : "Name"}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
             <Badge
               variant={categoryId == null ? "default" : "outline"}
-              className="cursor-pointer transition-colors hover:opacity-90"
+              className="cursor-pointer"
               onClick={() => setCategoryId(null)}
             >
               All
             </Badge>
-            {categories.map((cat) => (
+            {categoryChips.map((cat) => (
               <Badge
                 key={cat.id}
                 variant={categoryId === cat.id ? "default" : "outline"}
-                className="cursor-pointer transition-colors hover:opacity-90"
+                className="cursor-pointer"
                 onClick={() => setCategoryId(cat.id)}
               >
                 {cat.name}
@@ -124,35 +134,21 @@ export default function ExpertsPage() {
       </div>
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        {isLoading ? (
+        {isLoading && asExpertList(data?.data).length === 0 ? (
           <ProgressLoaderScreen label="Loading experts…" />
-        ) : isError ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
-            <p className="font-medium text-foreground">Could not load experts</p>
-            <p className="mt-1 text-sm text-muted-foreground">Please try again.</p>
-            <Button variant="outline" className="mt-4" onClick={() => void refetch()}>
-              Retry
-            </Button>
-          </div>
         ) : (
           <>
             <p className="mb-6 text-sm text-muted-foreground">
               {filtered.length} expert{filtered.length !== 1 ? "s" : ""} found
             </p>
-
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((expert) => (
                 <ExpertCard key={expert.id} expert={expert} />
               ))}
             </div>
-
             {filtered.length === 0 && (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
-                <Search className="size-12 text-muted-foreground" />
-                <p className="mt-4 font-medium text-foreground">No experts match your filters</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Try a different search or category.
-                </p>
+              <div className="rounded-xl border border-dashed border-border py-16 text-center">
+                <p className="font-medium">No experts match your filters</p>
                 <Button
                   variant="outline"
                   className="mt-4"
@@ -172,50 +168,10 @@ export default function ExpertsPage() {
   )
 }
 
-function ExpertCard({ expert }: { expert: ExpertItem }) {
-  const [imgFailed, setImgFailed] = React.useState(false)
-  const src = !imgFailed && expert.image ? expert.image : PLACEHOLDER_AVATAR
-
-  React.useEffect(() => {
-    setImgFailed(false)
-  }, [expert.image])
-
+export default function ExpertsPage() {
   return (
-    <Card className="overflow-hidden transition-shadow hover:shadow-md">
-      <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={expert.name}
-          className="size-full object-cover"
-          onError={() => {
-            if (src !== PLACEHOLDER_AVATAR) setImgFailed(true)
-          }}
-        />
-        <div className="absolute right-2 top-2">
-          <Badge variant="secondary" className="text-xs">
-            {expert.yearsExperience}+ yrs
-          </Badge>
-        </div>
-      </div>
-      <CardContent className="p-4">
-        <Badge variant="outline" className="mb-2 text-xs">
-          {expert.category}
-        </Badge>
-        <h2 className="font-semibold text-foreground">{expert.name}</h2>
-        <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
-          {expert.headline || expert.subcategory}
-        </p>
-        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{expert.bio}</p>
-      </CardContent>
-      <CardFooter className="flex gap-2 border-t border-border p-4">
-        <Button size="sm" className="flex-1 gap-1.5" asChild>
-          <Link href={`/experts/${expert.slug}`}>
-            <Video className="size-4" />
-            Book Consultation
-          </Link>
-        </Button>
-      </CardFooter>
-    </Card>
+    <React.Suspense fallback={<ProgressLoaderScreen label="Loading experts…" />}>
+      <ExpertsPageInner />
+    </React.Suspense>
   )
 }
