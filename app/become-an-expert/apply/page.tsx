@@ -38,6 +38,16 @@ const emptyEdu = (): EducationEntry => ({ institution: "", degree: "", year: "" 
 const emptyExp = (): ExperienceEntry => ({ title: "", organization: "", start_year: "", end_year: "", description: "" })
 const emptyPort = (): PortfolioEntry => ({ title: "", url: "" })
 
+const PORTFOLIO_TYPES = [
+  "Facebook",
+  "YouTube",
+  "LinkedIn",
+  "Instagram",
+  "X (Twitter)",
+  "Website",
+  "Others",
+] as const
+
 const LANGUAGE_OPTIONS = [
   "English", "Bengali", "Arabic", "Hindi", "Urdu", "French", "Spanish", "German", "Chinese", "Japanese",
 ]
@@ -192,22 +202,27 @@ export default function BecomeExpertApplyPage() {
           </p>
         </div>
 
-        <div className="mb-8 flex gap-2">
+        <div className="mb-8 flex gap-2" role="tablist" aria-label="Application sections">
           {STEPS.map((s) => {
             const Icon = s.icon
+            const active = step === s.id
             return (
-              <div
+              <button
                 key={s.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setStep(s.id)}
                 className={cn(
-                  "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-sm",
-                  step >= s.id
+                  "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                  active
                     ? "border-primary/50 bg-primary/5 text-foreground"
-                    : "border-border bg-muted/30 text-muted-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
                 )}
               >
                 <Icon className="size-4 shrink-0" />
                 <span className="hidden sm:inline">{s.title}</span>
-              </div>
+              </button>
             )
           })}
         </div>
@@ -268,28 +283,10 @@ export default function BecomeExpertApplyPage() {
                       </button>
                     ))}
                   </div>
-                  <LanguageCustomInput
-                    selected={form.languages}
-                    onAdd={(lang) => {
-                      if (!form.languages.includes(lang)) set("languages", [...form.languages, lang])
-                    }}
-                  />
                   {form.languages.length === 0 && (
                     <p className="text-xs text-destructive">Select at least one language</p>
                   )}
                   <p className="text-xs text-muted-foreground">{form.languages.length} selected</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="registration_value">
-                    Registration / License Number{" "}
-                    <span className="text-muted-foreground">(optional)</span>
-                  </Label>
-                  <Input
-                    id="registration_value"
-                    value={form.registration_value}
-                    onChange={(e) => set("registration_value", e.target.value)}
-                    placeholder="e.g. BMDC-12345"
-                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="intro_video">Intro Video URL <span className="text-muted-foreground">(optional)</span></Label>
@@ -394,6 +391,18 @@ export default function BecomeExpertApplyPage() {
                     onChange={(e) => set("years_of_experience", e.target.value)}
                     placeholder="e.g. 5"
                     required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="registration_value">
+                    Registration / License Number{" "}
+                    <span className="text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Input
+                    id="registration_value"
+                    value={form.registration_value}
+                    onChange={(e) => set("registration_value", e.target.value)}
+                    placeholder="e.g. BMDC-12345"
                   />
                 </div>
               </CardContent>
@@ -553,7 +562,7 @@ export default function BecomeExpertApplyPage() {
               <Card className="border-border">
                 <CardHeader>
                   <CardTitle>Portfolio</CardTitle>
-                  <CardDescription>Links to your work or website.</CardDescription>
+                  <CardDescription>Social links and website.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {form.portfolio.map((port, i) => (
@@ -570,13 +579,17 @@ export default function BecomeExpertApplyPage() {
                       )}
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                          <Label>Title</Label>
-                          <Input
+                          <Label>Type</Label>
+                          <Select
                             value={port.title}
                             onChange={(e) => updateArrayItem<PortfolioEntry>("portfolio", i, "title", e.target.value)}
-                            placeholder="e.g. Personal website"
                             required
-                          />
+                          >
+                            <option value="">Select type</option>
+                            {PORTFOLIO_TYPES.map((type) => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </Select>
                         </div>
                         <div className="space-y-1.5">
                           <Label>URL</Label>
@@ -638,35 +651,5 @@ export default function BecomeExpertApplyPage() {
         </form>
       </div>
     </main>
-  )
-}
-
-function LanguageCustomInput({
-  selected,
-  onAdd,
-}: {
-  selected: string[]
-  onAdd: (lang: string) => void
-}) {
-  const [value, setValue] = React.useState("")
-  const handle = () => {
-    const trimmed = value.trim()
-    if (!trimmed) return
-    onAdd(trimmed)
-    setValue("")
-  }
-  return (
-    <div className="flex gap-2">
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handle() } }}
-        placeholder="Other language…"
-        className="h-8 text-sm"
-      />
-      <Button type="button" size="sm" variant="outline" onClick={handle} className="shrink-0">
-        <Plus className="size-3.5" />
-      </Button>
-    </div>
   )
 }

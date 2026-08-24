@@ -88,7 +88,6 @@ const navSections: NavSection[] = [
         href: "/dashboard/application",
         label: "Application",
         icon: ClipboardList,
-        roles: ["expert"],
       },
     ],
   },
@@ -107,6 +106,7 @@ const USER_ALLOWED = new Set([
   "/dashboard/messages",
   "/dashboard/reviews",
   "/dashboard/settings",
+  "/dashboard/application",
 ])
 
 function isUserAllowedPath(pathname: string) {

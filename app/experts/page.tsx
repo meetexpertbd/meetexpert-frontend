@@ -11,9 +11,8 @@ import { ExpertCard } from "@/components/expert-card"
 import { useGet } from "@/hooks/use-get"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
-import { FALLBACK_EXPERTS, asExpertList, mapExpertToItem } from "@/lib/experts-data"
+import { asExpertList, mapExpertToItem } from "@/lib/experts-data"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
-import { CATEGORIES_GRID } from "@/lib/expert-categories"
 import { cn } from "@/lib/utils"
 
 type SortOption = "experience" | "name"
@@ -38,15 +37,12 @@ function ExpertsPageInner() {
 
   const { data, isLoading } = useGet<ApiEnvelope<ExpertEntity[]>>(listUrl)
 
-  const experts = React.useMemo(() => {
-    const list = asExpertList(data?.data).map(mapExpertToItem)
-    return list.length > 0 ? list : FALLBACK_EXPERTS
-  }, [data])
+  const experts = React.useMemo(
+    () => asExpertList(data?.data).map(mapExpertToItem),
+    [data]
+  )
 
-  const categoryChips =
-    categories.length > 0
-      ? categories
-      : CATEGORIES_GRID.map((c, i) => ({ id: -(i + 1), name: c.label }))
+  const categoryChips = categories
 
   const filtered = React.useMemo(() => {
     let list = experts.filter((e) => {
@@ -59,10 +55,7 @@ function ExpertsPageInner() {
         e.headline.toLowerCase().includes(q) ||
         e.bio.toLowerCase().includes(q) ||
         e.skills.some((s) => s.toLowerCase().includes(q))
-      const matchCat =
-        categoryId == null ||
-        e.categoryId === categoryId ||
-        (categoryId < 0 && e.category === categoryChips.find((c) => c.id === categoryId)?.name)
+      const matchCat = categoryId == null || e.categoryId === categoryId
       return matchQ && matchCat
     })
     list = [...list].sort((a, b) => {
@@ -70,7 +63,7 @@ function ExpertsPageInner() {
       return b.yearsExperience - a.yearsExperience
     })
     return list
-  }, [experts, search, sortBy, categoryId, categoryChips])
+  }, [experts, search, sortBy, categoryId])
 
   return (
     <div className="min-h-screen bg-background">
@@ -148,17 +141,23 @@ function ExpertsPageInner() {
             </div>
             {filtered.length === 0 && (
               <div className="rounded-xl border border-dashed border-border py-16 text-center">
-                <p className="font-medium">No experts match your filters</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => {
-                    setSearch("")
-                    setCategoryId(null)
-                  }}
-                >
-                  Clear filters
-                </Button>
+                <p className="font-medium">
+                  {experts.length === 0
+                    ? "No experts available yet"
+                    : "No experts match your filters"}
+                </p>
+                {experts.length > 0 && (
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => {
+                      setSearch("")
+                      setCategoryId(null)
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                )}
               </div>
             )}
           </>

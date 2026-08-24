@@ -461,8 +461,50 @@ export async function fetchBookingMeeting(token: string, bookingId: number | str
   return get<ApiEnvelope<unknown>>(`/bookings/${bookingId}/meeting`, { token })
 }
 
+export type ExpertApplicationRef = {
+  id: number
+  name: string
+  slug?: string
+}
+
+export type ExpertApplicationDocument = {
+  name: string
+  path: string
+  url: string | null
+}
+
+export type ExpertApplicationStatus =
+  | "pending"
+  | "needs_correction"
+  | "approved"
+  | "rejected"
+
 export type ExpertApplication = {
-  id?: number
+  id: number
+  status: ExpertApplicationStatus
+  professional_headline: string
+  bio: string
+  years_of_experience: number
+  registration_value: string | null
+  intro_video?: string | null
+  intro_video_url?: string | null
+  languages: string[]
+  avatar?: string | null
+  avatar_url?: string | null
+  documents?: ExpertApplicationDocument[]
+  education: EducationEntry[] | null
+  experience: ExperienceEntry[] | null
+  portfolio: PortfolioEntry[] | null
+  admin_feedback?: string | null
+  reviewed_at?: string | null
+  category: ExpertApplicationRef
+  subcategory: ExpertApplicationRef
+  skills: ExpertApplicationRef[]
+  created_at?: string
+  updated_at?: string
+}
+
+export type ExpertApplicationInput = {
   category_id: number
   subcategory_id: number
   professional_headline: string
@@ -475,12 +517,6 @@ export type ExpertApplication = {
   education: EducationEntry[]
   experience: ExperienceEntry[]
   portfolio: PortfolioEntry[]
-  status?: "pending" | "approved" | "rejected"
-  created_at?: string
-  updated_at?: string
-}
-
-export type ExpertApplicationInput = Omit<ExpertApplication, "id" | "status" | "created_at" | "updated_at"> & {
   avatar?: File | null
 }
 
@@ -511,16 +547,8 @@ export async function submitExpertApplication(token: string, input: ExpertApplic
 }
 
 export async function fetchExpertApplication(token: string) {
-  return get<ApiEnvelope<ExpertApplication>>(
+  return get<ApiEnvelope<ExpertApplication | null>>(
     "/expert/application",
-    { token }
-  )
-}
-
-export async function updateExpertApplication(token: string, input: Partial<ExpertApplicationInput>) {
-  return put<ApiEnvelope<ExpertApplication>>(
-    "/expert/application",
-    input,
     { token }
   )
 }

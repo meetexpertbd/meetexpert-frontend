@@ -11,8 +11,7 @@ import { useGet } from "@/hooks/use-get"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
-import { FALLBACK_EXPERTS, asExpertList, mapExpertToItem, type ExpertItem } from "@/lib/experts-data"
-import { CATEGORIES_GRID } from "@/lib/expert-categories"
+import { asExpertList, mapExpertToItem, type ExpertItem } from "@/lib/experts-data"
 import { cn } from "@/lib/utils"
 
 type SortOption = "experience" | "name"
@@ -50,15 +49,15 @@ export function FeatureExperts() {
     `${EXPERTS_API_URL}?per_page=20`
   )
 
-  const experts = React.useMemo(() => {
-    const list = asExpertList(data?.data).map(mapExpertToItem)
-    return list.length > 0 ? list : FALLBACK_EXPERTS
-  }, [data])
+  const experts = React.useMemo(
+    () => asExpertList(data?.data).map(mapExpertToItem),
+    [data]
+  )
 
-  const categoryFilters = React.useMemo(() => {
-    const names = categories.length > 0 ? categories.map((c) => c.name) : CATEGORIES_GRID.map((c) => c.label)
-    return ["All", ...names]
-  }, [categories])
+  const categoryFilters = React.useMemo(
+    () => ["All", ...categories.map((c) => c.name)],
+    [categories]
+  )
 
   const filtered = React.useMemo(
     () => filterAndSort(experts, "", category, sortBy),
@@ -129,9 +128,13 @@ export function FeatureExperts() {
             className="flex items-stretch gap-4 overflow-x-auto pb-4 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             style={{ scrollSnapType: "x mandatory" }}
           >
-            {isLoading && asExpertList(data?.data).length === 0 ? (
+            {isLoading && experts.length === 0 ? (
               <div className="flex w-full items-center justify-center py-16">
                 <ProgressLoader size="lg" label="Loading experts…" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex w-full items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
+                <p className="text-sm text-muted-foreground">No experts available yet.</p>
               </div>
             ) : (
               filtered.map((expert) => (

@@ -25,7 +25,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CATEGORIES_GRID } from "@/lib/expert-categories"
+import { ProgressLoader } from "@/components/ui/progress-loader"
+import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth-store"
 import { useRouter } from "next/navigation"
@@ -73,6 +74,7 @@ export default function BecomeAnExpertPage() {
   const user = useAuthStore((s) => s.user)
   const isHydrated = useAuthStore((s) => s.isHydrated)
   const isExpert = user?.user_type === "expert"
+  const { categories, isLoading: categoriesLoading } = useTaxonomy()
 
   React.useEffect(() => {
     if (isHydrated && isExpert) router.replace("/dashboard")
@@ -158,30 +160,42 @@ export default function BecomeAnExpertPage() {
             Categories We Support
           </h2>
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {CATEGORIES_GRID.map((cat) => {
-              const Icon = categoryIcons[cat.label] ?? Briefcase
-              return (
-                <Card key={cat.label} className="border-border">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-                        <Icon className="size-4 text-primary" />
+            {categoriesLoading && categories.length === 0 ? (
+              <div className="col-span-full flex justify-center py-8">
+                <ProgressLoader size="lg" label="Loading categories…" />
+              </div>
+            ) : categories.length === 0 ? (
+              <p className="col-span-full text-center text-sm text-muted-foreground">
+                No categories available yet.
+              </p>
+            ) : (
+              categories.map((cat) => {
+                const Icon = categoryIcons[cat.name] ?? Briefcase
+                return (
+                  <Card key={cat.id} className="border-border">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                          <Icon className="size-4 text-primary" />
+                        </div>
+                        <h3 className="font-semibold text-foreground">{cat.name}</h3>
                       </div>
-                      <h3 className="font-semibold text-foreground">{cat.label}</h3>
-                    </div>
-                    <ul className="mt-3 flex flex-wrap gap-1.5">
-                      {cat.items.map((sub) => (
-                        <li key={sub}>
-                          <Badge variant="outline" className="text-xs font-normal">
-                            {sub}
-                          </Badge>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                      {cat.subcategories.length > 0 && (
+                        <ul className="mt-3 flex flex-wrap gap-1.5">
+                          {cat.subcategories.slice(0, 6).map((sub) => (
+                            <li key={sub.id}>
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {sub.name}
+                              </Badge>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })
+            )}
           </div>
           <p className="mt-6 text-center text-sm font-medium text-muted-foreground">
             + Many More Fields — add yours in the application

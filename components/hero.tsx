@@ -13,17 +13,13 @@ import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
 import type { ApiEnvelope } from "@/lib/auth-api"
 import {
-  FALLBACK_EXPERTS,
   PLACEHOLDER_AVATAR,
   asExpertList,
   expertProfileHref,
   formatSlotPrice,
   mapExpertToItem,
 } from "@/lib/experts-data"
-import { CATEGORIES_GRID } from "@/lib/expert-categories"
 import { cn } from "@/lib/utils"
-
-const FALLBACK_CHIPS = CATEGORIES_GRID.map((c) => c.label)
 
 function HeroPortrait({
   name,
@@ -106,14 +102,14 @@ export function Hero() {
     `${EXPERTS_API_URL}?per_page=8`
   )
 
-  const experts = React.useMemo(() => {
-    const list = asExpertList(data?.data).map(mapExpertToItem)
-    return list.length > 0 ? list : FALLBACK_EXPERTS
-  }, [data])
+  const experts = React.useMemo(
+    () => asExpertList(data?.data).map(mapExpertToItem),
+    [data]
+  )
 
   const featured = experts[0]
-  const chips = categories.length > 0 ? categories.map((c) => c.name) : FALLBACK_CHIPS
-  const liveCount = asExpertList(data?.data).length
+  const chips = categories.map((c) => c.name)
+  const liveCount = experts.length
 
   function goSearch(e?: React.FormEvent) {
     e?.preventDefault()
@@ -169,21 +165,23 @@ export function Hero() {
               </div>
             </form>
 
-            <div className="flex flex-wrap gap-2">
-              {chips.slice(0, 6).map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => goCategory(name)}
-                  className={cn(
-                    "rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground shadow-sm",
-                    "transition-colors hover:border-primary/40 hover:text-foreground"
-                  )}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
+            {chips.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {chips.slice(0, 6).map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => goCategory(name)}
+                    className={cn(
+                      "rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground shadow-sm",
+                      "transition-colors hover:border-primary/40 hover:text-foreground"
+                    )}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-3">
               <Button size="lg" asChild>
