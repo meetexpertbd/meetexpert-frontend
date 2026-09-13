@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Lock, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, ExternalLink, Lock, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ProgressLoader, ProgressLoaderScreen } from "@/components/ui/progress-loader"
@@ -11,15 +11,16 @@ import { ApiError } from "@/lib/api-client"
 import { createBooking } from "@/lib/expert-api"
 import { PLACEHOLDER_AVATAR } from "@/lib/experts-data"
 import {
+  DEFAULT_PAYMENT_METHOD,
   PAYMENT_METHODS,
   checkoutDraftFromSearch,
   checkoutFees,
+  extractPaymentUrl,
   formatBdt,
-  type PaymentMethod,
+  saveCheckoutSession,
 } from "@/lib/checkout"
 import { PaymentMethodIcon } from "@/components/payment-icons"
 import { useAuthStore } from "@/store/auth-store"
-import { cn } from "@/lib/utils"
 
 function formatTime(value: string): string {
   const m = value.match(/^(\d{1,2}):(\d{2})/)
@@ -42,6 +43,22 @@ function formatDate(value: string): string {
   })
 }
 
+function apiErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) {
+    const body = e.body
+    if (body && typeof body === "object" && "errors" in body) {
+      const errors = (body as { errors?: Record<string, string[] | string> }).errors
+      const first = errors
+        ? Object.values(errors).flatMap((v) => (Array.isArray(v) ? v : [v]))[0]
+        : null
+      return first || e.message
+    }
+    return e.message
+  }
+  if (e instanceof Error) return e.message
+  return fallback
+}
+
 function CheckoutPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -52,10 +69,12 @@ function CheckoutPageInner() {
     [searchParams]
   )
 
-  const [method, setMethod] = React.useState<PaymentMethod>("bkash")
+  const method = DEFAULT_PAYMENT_METHOD
+  const selected = PAYMENT_METHODS[0]
   const [paying, setPaying] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [done, setDone] = React.useState(false)
+  const [redirecting, setRedirecting] = React.useState(false)
+  const [gatewayUrl, setGatewayUrl] = React.useState<string | null>(null)
   const [imgFailed, setImgFailed] = React.useState(false)
 
   const checkoutPath = React.useMemo(() => {
@@ -75,29 +94,36 @@ function CheckoutPageInner() {
     setError(null)
     setPaying(true)
     try {
-      await createBooking(token, {
+      const res = await createBooking(token, {
         expert_id: draft.expertId,
         availability_slot_id: draft.availabilitySlotId,
         date: draft.date,
+        payment_method: method,
       })
-      setDone(true)
-    } catch (e) {
-      let message = "Payment could not be completed."
-      if (e instanceof ApiError) {
-        const body = e.body
-        if (body && typeof body === "object" && "errors" in body) {
-          const errors = (body as { errors?: Record<string, string[] | string> }).errors
-          const first = errors
-            ? Object.values(errors).flatMap((v) => (Array.isArray(v) ? v : [v]))[0]
-            : null
-          message = first || e.message
-        } else {
-          message = e.message
-        }
-      } else if (e instanceof Error) {
-        message = e.message
+
+      const createdPayment = res.data?.payment
+      const createdBooking = res.data?.booking
+      if (!createdPayment?.id || !createdBooking?.id) {
+        throw new Error("Payment was not created. Please try again.")
       }
-      setError(message)
+
+      saveCheckoutSession({
+        bookingId: createdBooking.id,
+        paymentId: createdPayment.id,
+        expertSlug: draft.expertSlug,
+      })
+
+      const paymentUrl = extractPaymentUrl(res.data?.checkout)
+      if (!paymentUrl) {
+        setError("Unable to start SSLCommerz payment")
+        return
+      }
+
+      setGatewayUrl(paymentUrl)
+      setRedirecting(true)
+      window.location.assign(paymentUrl)
+    } catch (e) {
+      setError(apiErrorMessage(e, "Could not start payment."))
     } finally {
       setPaying(false)
     }
@@ -120,28 +146,24 @@ function CheckoutPageInner() {
   }
 
   const image = !imgFailed && draft.expertImage ? draft.expertImage : PLACEHOLDER_AVATAR
-  const selected = PAYMENT_METHODS.find((m) => m.id === method)
   const fees = draft.amount != null ? checkoutFees(draft.amount) : null
 
-  if (done) {
+  if (redirecting) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
-          <CheckCircle2 className="size-7" />
-        </div>
-        <h1 className="mt-4 text-2xl font-bold">Booking confirmed</h1>
+        <ProgressLoader size="lg" className="mx-auto" />
+        <h1 className="mt-4 text-xl font-bold">Redirecting to SSLCommerz…</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Paid with {selected?.name}. Your session with {draft.expertName} is on{" "}
-          {formatDate(draft.date)} at {formatTime(draft.start)}.
+          Complete payment on SSLCommerz. You will return to MeetExpert after confirmation.
         </p>
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <Button asChild>
-            <Link href="/dashboard/bookings">View bookings</Link>
+        {gatewayUrl && (
+          <Button className="mt-6 gap-2" asChild>
+            <a href={gatewayUrl}>
+              Continue to SSLCommerz
+              <ExternalLink className="size-4" />
+            </a>
           </Button>
-          <Button variant="outline" asChild>
-            <Link href={`/experts/${draft.expertSlug}`}>Back to profile</Link>
-          </Button>
-        </div>
+        )}
       </div>
     )
   }
@@ -158,11 +180,10 @@ function CheckoutPageInner() {
 
       <h1 className="mt-6 text-2xl font-bold tracking-tight sm:text-3xl">Checkout</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Review your session and choose a payment method.
+        Review your session and pay with SSLCommerz.
       </p>
 
-      <div className="mt-8 grid gap-6 grid-cols-1 lg:grid-cols-2">        
-
+      <div className="mt-8 grid gap-6 grid-cols-1 lg:grid-cols-2">
         <Card className="h-fit lg:sticky lg:top-20">
           <CardContent className="space-y-4 p-6">
             <div className="flex gap-3">
@@ -229,34 +250,17 @@ function CheckoutPageInner() {
           <CardContent className="space-y-6 p-6">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Payment method</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">Select how you want to pay.</p>
-              <div className="mt-4 space-y-3" role="radiogroup" aria-label="Payment method">
-                {PAYMENT_METHODS.map((item) => {
-                  const checked = method === item.id
-                  return (
-                    <label
-                      key={item.id}
-                      className={cn(
-                        "flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors",
-                        checked ? item.accent : "border-border bg-card hover:bg-muted/30"
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="payment-method"
-                        value={item.id}
-                        checked={checked}
-                        onChange={() => setMethod(item.id)}
-                        className="size-4 accent-primary"
-                      />
-                      <PaymentMethodIcon id={item.id} className="size-11 shrink-0" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-foreground">{item.name}</span>
-                        <span className="block text-sm text-muted-foreground">{item.hint}</span>
-                      </span>
-                    </label>
-                  )
-                })}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                SSLCommerz is the only available payment method.
+              </p>
+              <div
+                className={`mt-4 flex items-center gap-3 rounded-xl border p-4 ${selected.accent}`}
+              >
+                <PaymentMethodIcon id={selected.id} className="size-11 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-foreground">{selected.name}</span>
+                  <span className="block text-sm text-muted-foreground">{selected.hint}</span>
+                </span>
               </div>
             </div>
 
@@ -272,19 +276,19 @@ function CheckoutPageInner() {
               {paying ? (
                 <>
                   <ProgressLoader size="sm" />
-                  Processing…
+                  Starting SSLCommerz…
                 </>
               ) : (
                 <>
                   <Lock className="size-4" />
                   {fees
-                    ? `Pay ${formatBdt(fees.total)} with ${selected?.name}`
-                    : `Pay with ${selected?.name}`}
+                    ? `Pay ${formatBdt(fees.total)} with SSLCommerz`
+                    : "Pay with SSLCommerz"}
                 </>
               )}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              Your booking is created after payment is confirmed.
+              You will be redirected to SSLCommerz. Booking confirms after successful payment.
             </p>
           </CardContent>
         </Card>

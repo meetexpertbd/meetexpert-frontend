@@ -128,6 +128,7 @@ export type CreateBookingInput = {
   expert_id: number
   availability_slot_id: number
   date: string
+  payment_method: "sslcommerz"
   notes?: string | null
 }
 
@@ -164,6 +165,20 @@ export type BookingReviewInput = {
   comment?: string | null
 }
 
+export type BookingPayment = {
+  id: number
+  booking_id: number
+  amount: number
+  currency: string
+  payment_method: string
+  status: string
+  provider_payment_id?: string | null
+  provider_trx_id?: string | null
+  paid_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
 export type BookingEntity = {
   id: number
   status: string
@@ -171,18 +186,51 @@ export type BookingEntity = {
   start_time: string
   end_time: string
   notes: string | null
+  amount?: number | null
+  currency?: string | null
   availability_slot_id: number
   expert?: BookingExpert | null
   user?: BookingUser | null
   review?: BookingReview | null
   meeting?: unknown
   meeting_joins?: MeetingJoins | null
+  payment?: BookingPayment | null
   created_at?: string
   updated_at?: string
 }
 
+export type PaymentCheckoutInfo = {
+  type?: string
+  instructions?: string
+  payment_url?: string | null
+  redirect?: boolean
+}
+
+export type BookingCheckoutPayload = {
+  payment_id?: number
+  booking_id?: number
+  amount?: number
+  currency?: string
+  payment_method?: string
+  status?: string
+  provider_payment_id?: string | null
+  checkout?: PaymentCheckoutInfo
+}
+
+export type CreateBookingResult = {
+  booking: BookingEntity
+  payment: BookingPayment
+  checkout: BookingCheckoutPayload
+}
+
+export type PaymentDetailsResult = {
+  payment: BookingPayment
+  checkout: BookingCheckoutPayload
+  booking: BookingEntity
+}
+
 export type UserBookingsParams = {
-  status?: "confirmed" | "cancelled"
+  status?: "confirmed" | "cancelled" | "pending_payment" | string
   page?: number
   per_page?: number
 }
@@ -221,7 +269,11 @@ function bookingsQuery(params?: UserBookingsParams): string {
 }
 
 export async function createBooking(token: string, input: CreateBookingInput) {
-  return post<ApiEnvelope<BookingEntity>>(BOOKINGS_API_URL, input, { token })
+  return post<ApiEnvelope<CreateBookingResult>>(BOOKINGS_API_URL, input, { token })
+}
+
+export async function fetchPayment(token: string, paymentId: number | string) {
+  return get<ApiEnvelope<PaymentDetailsResult>>(`/payments/${paymentId}`, { token })
 }
 
 export async function fetchUserBookings(

@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
+import { Skeleton } from "@/components/ui/skeleton"
 import { BookingReviewDialog, RatingStars } from "@/components/booking-review-dialog"
 import { resolveAvatarUrl } from "@/lib/auth-api"
 import {
@@ -114,6 +114,30 @@ function BookingAvatar({
         <User className="size-7 text-muted-foreground" />
       )}
     </div>
+  )
+}
+
+function BookingCardSkeleton() {
+  return (
+    <Card className="border-border">
+      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+        <Skeleton className="mx-auto size-14 shrink-0 rounded-full sm:mx-0" />
+        <div className="min-w-0 flex-1 space-y-2 text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </div>
+          <Skeleton className="mx-auto h-4 w-48 sm:mx-0" />
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          <Skeleton className="h-8 w-24" />
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -405,7 +429,11 @@ export default function BookingsPage() {
       </div>
 
       {loading ? (
-        <ProgressLoaderScreen label="Loading bookings…" />
+        <div className="space-y-3" aria-busy="true" aria-label="Loading bookings">
+          <BookingCardSkeleton />
+          <BookingCardSkeleton />
+          <BookingCardSkeleton />
+        </div>
       ) : error ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">

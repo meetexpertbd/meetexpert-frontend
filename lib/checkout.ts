@@ -1,7 +1,16 @@
-export type PaymentMethod = "bkash" | "ssl" | "stripe"
+export type PaymentMethod = "sslcommerz"
+
+export const DEFAULT_PAYMENT_METHOD: PaymentMethod = "sslcommerz"
 
 export const PLATFORM_FEE_RATE = 0.15
 export const VAT_RATE = 0.05
+
+export const CHECKOUT_SESSION_KEYS = {
+  bookingId: "mx_checkout_booking_id",
+  paymentId: "mx_checkout_payment_id",
+  expertSlug: "mx_checkout_expert_slug",
+  method: "mx_checkout_method",
+} as const
 
 export type CheckoutDraft = {
   expertId: number
@@ -31,10 +40,55 @@ export const PAYMENT_METHODS: {
   hint: string
   accent: string
 }[] = [
-  { id: "bkash", name: "bKash", hint: "Pay with your bKash wallet", accent: "border-[#E2136E]/40 bg-[#E2136E]/8" },
-  { id: "ssl", name: "SSLCOMMERZ", hint: "Cards, mobile banking & more", accent: "border-sky-500/40 bg-sky-500/8" },
-  { id: "stripe", name: "Stripe", hint: "Visa, Mastercard & international cards", accent: "border-indigo-500/40 bg-indigo-500/8" },
+  {
+    id: "sslcommerz",
+    name: "SSLCommerz",
+    hint: "Cards / mobile banking aggregator",
+    accent: "border-[#1A73E8]/40 bg-[#1A73E8]/8",
+  },
 ]
+
+export function saveCheckoutSession(payload: {
+  bookingId: number
+  paymentId: number
+  expertSlug?: string
+}) {
+  if (typeof window === "undefined") return
+  sessionStorage.setItem(CHECKOUT_SESSION_KEYS.bookingId, String(payload.bookingId))
+  sessionStorage.setItem(CHECKOUT_SESSION_KEYS.paymentId, String(payload.paymentId))
+  sessionStorage.setItem(CHECKOUT_SESSION_KEYS.method, DEFAULT_PAYMENT_METHOD)
+  if (payload.expertSlug) {
+    sessionStorage.setItem(CHECKOUT_SESSION_KEYS.expertSlug, payload.expertSlug)
+  }
+}
+
+export function readCheckoutSession() {
+  if (typeof window === "undefined") {
+    return { bookingId: null, paymentId: null, expertSlug: null, method: null }
+  }
+  return {
+    bookingId: sessionStorage.getItem(CHECKOUT_SESSION_KEYS.bookingId),
+    paymentId: sessionStorage.getItem(CHECKOUT_SESSION_KEYS.paymentId),
+    expertSlug: sessionStorage.getItem(CHECKOUT_SESSION_KEYS.expertSlug),
+    method: sessionStorage.getItem(CHECKOUT_SESSION_KEYS.method),
+  }
+}
+
+export function clearCheckoutSession() {
+  if (typeof window === "undefined") return
+  Object.values(CHECKOUT_SESSION_KEYS).forEach((key) => sessionStorage.removeItem(key))
+}
+
+export function extractPaymentUrl(checkoutPayload: unknown): string | null {
+  if (!checkoutPayload || typeof checkoutPayload !== "object") return null
+  const root = checkoutPayload as Record<string, unknown>
+  const nested =
+    root.checkout && typeof root.checkout === "object"
+      ? (root.checkout as Record<string, unknown>)
+      : root
+  const url = nested.payment_url
+  return typeof url === "string" && url.length > 0 ? url : null
+}
 
 export function buildCheckoutPath(draft: CheckoutDraft) {
   const q = new URLSearchParams({
@@ -86,7 +140,14 @@ export function checkoutDraftFromSearch(params: URLSearchParams): CheckoutDraft 
   const date = params.get("date") ?? ""
   const start = params.get("start") ?? ""
   const end = params.get("end") ?? ""
-  if (!expertSlug || !Number.isFinite(expertId) || !Number.isFinite(availabilitySlotId) || !date || !start || !end) {
+  if (
+    !expertSlug ||
+    !Number.isFinite(expertId) ||
+    !Number.isFinite(availabilitySlotId) ||
+    !date ||
+    !start ||
+    !end
+  ) {
     return null
   }
   return {
