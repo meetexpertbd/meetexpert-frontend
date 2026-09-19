@@ -16,6 +16,7 @@ import { ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { ApiError } from "@/lib/api-client"
 import {
   fetchExpertApplication,
+  applicationAdminFeedback,
   type ExpertApplication,
   type ExpertApplicationStatus,
 } from "@/lib/expert-api"
@@ -23,7 +24,7 @@ import { PLACEHOLDER_AVATAR } from "@/lib/experts-data"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
 
-function StatusBadge({ status }: { status: ExpertApplicationStatus }) {
+function StatusBadge({ status }: { status: ExpertApplicationStatus | string }) {
   if (status === "approved") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
@@ -40,18 +41,18 @@ function StatusBadge({ status }: { status: ExpertApplicationStatus }) {
       </span>
     )
   }
-  if (status === "needs_correction") {
+  if (status === "review" || status === "needs_correction") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-400">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-800 dark:text-sky-300">
         <AlertCircle className="size-3.5" />
-        Needs correction
+        Review
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/15 px-3 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-400">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300">
       <Clock className="size-3.5" />
-      Pending review
+      Pending
     </span>
   )
 }
@@ -160,8 +161,8 @@ export default function ApplicationPage() {
   const avatar =
     !imgFailed && application.avatar_url ? application.avatar_url : PLACEHOLDER_AVATAR
   const videoUrl = application.intro_video_url || application.intro_video
-  const canResubmit =
-    application.status === "needs_correction" || application.status === "rejected"
+  const feedback = applicationAdminFeedback(application)
+  const canResubmit = application.status !== "approved"
 
   return (
     <div className="p-6 sm:p-8">
@@ -179,7 +180,14 @@ export default function ApplicationPage() {
           <StatusBadge status={application.status} />
           {canResubmit && (
             <Button size="sm" asChild>
-              <Link href="/become-an-expert/apply">Update & resubmit</Link>
+              <Link href="/become-an-expert/apply">
+                {application.status === "pending"
+                  ? "Update application"
+                  : application.status === "review" ||
+                      application.status === "needs_correction"
+                    ? "Update application"
+                    : "Update & resubmit"}
+              </Link>
             </Button>
           )}
         </div>
@@ -189,7 +197,7 @@ export default function ApplicationPage() {
         <Card
           className={cn(
             "border-border",
-            application.admin_feedback &&
+            feedback &&
               application.status !== "approved" &&
               "border-amber-500/40 bg-amber-500/5"
           )}
@@ -206,20 +214,21 @@ export default function ApplicationPage() {
                 "Your application was approved. You can use expert features."}
               {application.status === "rejected" &&
                 "Your application was rejected. Review the feedback below."}
-              {application.status === "needs_correction" &&
-                "Admin requested changes. Update your application and resubmit."}
+              {(application.status === "review" ||
+                application.status === "needs_correction") &&
+                "Your application is under review. You can still update it until it is approved."}
               {formatDate(application.reviewed_at)
                 ? ` Reviewed ${formatDate(application.reviewed_at)}.`
                 : ""}
             </CardDescription>
           </CardHeader>
-          {application.admin_feedback && (
+          {feedback && (
             <CardContent>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Admin feedback
               </p>
               <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
-                {application.admin_feedback}
+                {feedback}
               </p>
             </CardContent>
           )}

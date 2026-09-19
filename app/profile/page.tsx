@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Camera, User } from "lucide-react"
+import { Briefcase, Camera, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ProgressLoader, ProgressLoaderScreen } from "@/components/ui/progress-loader"
-import { ApiError } from "@/lib/api-client"
+import { ExpertDetailsForm } from "@/components/profile/expert-details-form"
 import {
   fetchProfile,
   updateUserProfile,
@@ -23,6 +23,8 @@ import {
 } from "@/lib/auth-api"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
+
+type ProfileTab = "profile" | "expert"
 
 type FormState = {
   gender: Gender | ""
@@ -67,6 +69,9 @@ export default function UserProfilePage() {
   const isHydrated = useAuthStore((s) => s.isHydrated)
   const setUser = useAuthStore((s) => s.setUser)
 
+  const isExpert = authUser?.user_type === "expert"
+  const [tab, setTab] = React.useState<ProfileTab>("profile")
+
   const [profile, setProfile] = React.useState<UserProfile | null>(null)
   const [form, setForm] = React.useState<FormState>(emptyForm)
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
@@ -76,8 +81,6 @@ export default function UserProfilePage() {
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
 
-  const isExpert = authUser?.user_type === "expert"
-
   React.useEffect(() => {
     if (isHydrated && !token) {
       router.replace("/login")
@@ -85,10 +88,7 @@ export default function UserProfilePage() {
   }, [isHydrated, token, router])
 
   React.useEffect(() => {
-    if (!isHydrated || !token || isExpert) {
-      if (isHydrated && token && isExpert) setIsLoading(false)
-      return
-    }
+    if (!isHydrated || !token) return
 
     let cancelled = false
 
@@ -104,11 +104,7 @@ export default function UserProfilePage() {
         setUser(toAuthUser(user))
       } catch (e) {
         if (cancelled) return
-        if (e instanceof ApiError && e.status === 403) {
-          setError("This profile page is for regular users only.")
-        } else {
-          setError(e instanceof Error ? e.message : "Failed to load profile")
-        }
+        setError(e instanceof Error ? e.message : "Failed to load profile")
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -118,7 +114,7 @@ export default function UserProfilePage() {
     return () => {
       cancelled = true
     }
-  }, [isHydrated, token, isExpert, setUser])
+  }, [isHydrated, token, setUser])
 
   React.useEffect(() => {
     return () => {
@@ -168,7 +164,6 @@ export default function UserProfilePage() {
             setAvatarPreview(serverAvatar)
           }
           probe.onerror = () => {
-            // Storage URL blocked (often 403). Keep local preview if we just uploaded.
             if (!previousPreview) setAvatarPreview(null)
           }
           probe.src = serverAvatar
@@ -194,210 +189,234 @@ export default function UserProfilePage() {
     )
   }
 
-  if (isExpert) {
-    return (
-      <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-lg items-center px-4 py-12">
-        <Card className="w-full">
-          <CardContent className="space-y-4 p-6 text-center sm:p-8">
-            <h1 className="text-xl font-bold">Expert account</h1>
-            <p className="text-sm text-muted-foreground">
-              User profile editing is only available for regular users. Manage your
-              expert settings from the dashboard.
-            </p>
-            <Button asChild>
-              <Link href="/dashboard">Go to dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
+  const myProfileForm = isLoading ? (
+    <div className="flex flex-col items-center justify-center py-16">
+      <ProgressLoader size="lg" label="Loading profile…" />
+    </div>
+  ) : (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {success && (
+        <p className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+          {success}
+        </p>
+      )}
+
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+        <div className="relative">
+          <div className="flex size-24 items-center justify-center overflow-hidden rounded-full border-2 border-border bg-muted">
+            {avatarPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarPreview}
+                alt=""
+                className="size-full object-cover"
+                onError={() => setAvatarPreview(null)}
+              />
+            ) : (
+              <User className="size-10 text-muted-foreground" />
+            )}
+          </div>
+          <label
+            className={cn(
+              "absolute bottom-0 right-0 flex size-8 cursor-pointer items-center justify-center rounded-full",
+              "border border-border bg-background text-foreground shadow-sm hover:bg-muted"
+            )}
+          >
+            <Camera className="size-4" />
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleAvatarChange}
+            />
+          </label>
+        </div>
+        <div className="min-w-0 flex-1 text-center sm:text-left">
+          <p className="truncate text-lg font-semibold">
+            {profile?.name ?? authUser?.name ?? "User"}
+          </p>
+          <p className="truncate text-sm text-muted-foreground">
+            {profile?.email ?? authUser?.email}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Email cannot be changed here.
+          </p>
+        </div>
       </div>
-    )
-  }
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            value={form.phone}
+            onChange={(e) => updateField("phone", e.target.value)}
+            placeholder="+8801XXXXXXXXX"
+            maxLength={32}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="date_of_birth">Date of birth</Label>
+          <Input
+            id="date_of_birth"
+            type="date"
+            value={form.date_of_birth}
+            onChange={(e) => updateField("date_of_birth", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="gender">Gender</Label>
+          <Select
+            id="gender"
+            value={form.gender}
+            onChange={(e) =>
+              updateField("gender", e.target.value as Gender | "")
+            }
+          >
+            <option value="">Select gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="preferred_language">Preferred language</Label>
+          <Select
+            id="preferred_language"
+            value={form.preferred_language}
+            onChange={(e) =>
+              updateField(
+                "preferred_language",
+                e.target.value as PreferredLanguage | ""
+              )
+            }
+          >
+            <option value="bn">Bangla</option>
+            <option value="en">English</option>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="district">District</Label>
+          <Input
+            id="district"
+            value={form.district}
+            onChange={(e) => updateField("district", e.target.value)}
+            placeholder="Dhaka"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="country">Country</Label>
+          <Input
+            id="country"
+            value={form.country}
+            onChange={(e) =>
+              updateField("country", e.target.value.toUpperCase().slice(0, 2))
+            }
+            placeholder="BD"
+            maxLength={2}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="present_address">Present address</Label>
+        <Textarea
+          id="present_address"
+          value={form.present_address}
+          onChange={(e) => updateField("present_address", e.target.value)}
+          rows={3}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="permanent_address">Permanent address</Label>
+        <Textarea
+          id="permanent_address"
+          value={form.permanent_address}
+          onChange={(e) => updateField("permanent_address", e.target.value)}
+          rows={3}
+        />
+      </div>
+
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" asChild>
+          <Link href="/dashboard/bookings">Cancel</Link>
+        </Button>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <ProgressLoader size="sm" />
+              Saving...
+            </>
+          ) : (
+            "Save changes"
+          )}
+        </Button>
+      </div>
+    </form>
+  )
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">My Profile</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          {isExpert && tab === "expert" ? "Expert Details" : "My Profile"}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          View and update your personal information.
+          {isExpert && tab === "expert"
+            ? "View and update your public expert profile."
+            : "View and update your personal information."}
         </p>
       </div>
 
-      <Card>
-        <CardContent className="p-6 sm:p-8">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <ProgressLoader size="lg" label="Loading profile…" />
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-              {success && (
-                <p className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-                  {success}
-                </p>
-              )}
+      {isExpert && (
+        <div className="mb-6 flex gap-2" role="tablist" aria-label="Profile sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "profile"}
+            onClick={() => setTab("profile")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors",
+              tab === "profile"
+                ? "border-primary/50 bg-primary/5 text-foreground"
+                : "border-border bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            )}
+          >
+            <User className="size-4 shrink-0" />
+            My Profile
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "expert"}
+            onClick={() => setTab("expert")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors",
+              tab === "expert"
+                ? "border-primary/50 bg-primary/5 text-foreground"
+                : "border-border bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            )}
+          >
+            <Briefcase className="size-4 shrink-0" />
+            Expert Details
+          </button>
+        </div>
+      )}
 
-              <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                <div className="relative">
-                  <div className="flex size-24 items-center justify-center overflow-hidden rounded-full border-2 border-border bg-muted">
-                    {avatarPreview ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatarPreview}
-                        alt=""
-                        className="size-full object-cover"
-                        onError={() => setAvatarPreview(null)}
-                      />
-                    ) : (
-                      <User className="size-10 text-muted-foreground" />
-                    )}
-                  </div>
-                  <label
-                    className={cn(
-                      "absolute bottom-0 right-0 flex size-8 cursor-pointer items-center justify-center rounded-full",
-                      "border border-border bg-background text-foreground shadow-sm hover:bg-muted"
-                    )}
-                  >
-                    <Camera className="size-4" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleAvatarChange}
-                    />
-                  </label>
-                </div>
-                <div className="min-w-0 flex-1 text-center sm:text-left">
-                  <p className="truncate text-lg font-semibold">
-                    {profile?.name ?? authUser?.name ?? "User"}
-                  </p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {profile?.email ?? authUser?.email}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Email cannot be changed here.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={form.phone}
-                    onChange={(e) => updateField("phone", e.target.value)}
-                    placeholder="+8801XXXXXXXXX"
-                    maxLength={32}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date_of_birth">Date of birth</Label>
-                  <Input
-                    id="date_of_birth"
-                    type="date"
-                    value={form.date_of_birth}
-                    onChange={(e) => updateField("date_of_birth", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender</Label>
-                  <Select
-                    id="gender"
-                    value={form.gender}
-                    onChange={(e) =>
-                      updateField("gender", e.target.value as Gender | "")
-                    }
-                  >
-                    <option value="">Select gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                    <option value="prefer_not_to_say">Prefer not to say</option>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="preferred_language">Preferred language</Label>
-                  <Select
-                    id="preferred_language"
-                    value={form.preferred_language}
-                    onChange={(e) =>
-                      updateField(
-                        "preferred_language",
-                        e.target.value as PreferredLanguage | ""
-                      )
-                    }
-                  >
-                    <option value="bn">Bangla</option>
-                    <option value="en">English</option>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="district">District</Label>
-                  <Input
-                    id="district"
-                    value={form.district}
-                    onChange={(e) => updateField("district", e.target.value)}
-                    placeholder="Dhaka"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    value={form.country}
-                    onChange={(e) =>
-                      updateField("country", e.target.value.toUpperCase().slice(0, 2))
-                    }
-                    placeholder="BD"
-                    maxLength={2}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="present_address">Present address</Label>
-                <Textarea
-                  id="present_address"
-                  value={form.present_address}
-                  onChange={(e) => updateField("present_address", e.target.value)}
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="permanent_address">Permanent address</Label>
-                <Textarea
-                  id="permanent_address"
-                  value={form.permanent_address}
-                  onChange={(e) => updateField("permanent_address", e.target.value)}
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <Button type="button" variant="outline" asChild>
-                  <Link href="/dashboard/bookings">Cancel</Link>
-                </Button>
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving ? (
-                    <>
-                      <ProgressLoader size="sm" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save changes"
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+      {isExpert && tab === "expert" ? (
+        <ExpertDetailsForm token={token} />
+      ) : (
+        <Card>
+          <CardContent className="p-6 sm:p-8">{myProfileForm}</CardContent>
+        </Card>
+      )}
     </div>
   )
 }

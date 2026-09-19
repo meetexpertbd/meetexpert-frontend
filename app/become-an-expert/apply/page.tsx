@@ -11,6 +11,10 @@ import {
   ChevronRight,
   Plus,
   Trash2,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,8 +25,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ProgressLoader, ProgressLoaderScreen } from "@/components/ui/progress-loader"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { useMutation } from "@/hooks"
-import { submitExpertApplication } from "@/lib/expert-api"
+import {
+  fetchExpertApplication,
+  submitExpertApplication,
+  applicationAdminFeedback,
+  type ExpertApplication,
+  type ExpertApplicationStatus,
+} from "@/lib/expert-api"
 import type { EducationEntry, ExperienceEntry, PortfolioEntry } from "@/lib/expert-api"
+import { ApiError } from "@/lib/api-client"
 import { useAuthStore } from "@/store/auth-store"
 import { cn } from "@/lib/utils"
 
@@ -58,7 +69,6 @@ type FormData = {
   languages: string[]
   registration_value: string
   intro_video: string
-  avatar: File | null
   categoryId: string
   subcategoryId: string
   skillIds: number[]
@@ -74,7 +84,6 @@ const initialForm: FormData = {
   languages: [],
   registration_value: "",
   intro_video: "",
-  avatar: null,
   categoryId: "",
   subcategoryId: "",
   skillIds: [],
@@ -82,6 +91,97 @@ const initialForm: FormData = {
   education: [emptyEdu()],
   experience: [emptyExp()],
   portfolio: [emptyPort()],
+}
+
+function applicationToForm(app: ExpertApplication): FormData {
+  const education =
+    Array.isArray(app.education) && app.education.length > 0
+      ? app.education.map((e) => ({
+          institution: e.institution ?? "",
+          degree: e.degree ?? "",
+          year: e.year != null ? String(e.year) : "",
+        }))
+      : [emptyEdu()]
+  const experience =
+    Array.isArray(app.experience) && app.experience.length > 0
+      ? app.experience.map((e) => ({
+          title: e.title ?? "",
+          organization: e.organization ?? "",
+          start_year: e.start_year != null ? String(e.start_year) : "",
+          end_year: e.end_year != null ? String(e.end_year) : "",
+          description: e.description ?? "",
+        }))
+      : [emptyExp()]
+  const portfolio =
+    Array.isArray(app.portfolio) && app.portfolio.length > 0
+      ? app.portfolio.map((p) => ({
+          title: p.title ?? "",
+          url: p.url ?? "",
+        }))
+      : [emptyPort()]
+
+  return {
+    professional_headline: app.professional_headline ?? "",
+    bio: app.bio ?? "",
+    languages: Array.isArray(app.languages) ? app.languages.map(String) : [],
+    registration_value: app.registration_value ?? "",
+    intro_video: app.intro_video_url || app.intro_video || "",
+    categoryId: app.category?.id != null ? String(app.category.id) : "",
+    subcategoryId: app.subcategory?.id != null ? String(app.subcategory.id) : "",
+    skillIds: Array.isArray(app.skills) ? app.skills.map((s) => s.id) : [],
+    years_of_experience:
+      app.years_of_experience != null ? String(app.years_of_experience) : "",
+    education,
+    experience,
+    portfolio,
+  }
+}
+
+function statusLabel(status: ExpertApplicationStatus | string): string {
+  if (status === "review" || status === "needs_correction") return "Review"
+  if (status === "approved") return "Approved"
+  if (status === "rejected") return "Rejected"
+  return "Pending"
+}
+
+function ApplicationStatusBadge({
+  status,
+  statusLabelText,
+}: {
+  status: ExpertApplicationStatus | string
+  statusLabelText?: string | null
+}) {
+  const label = statusLabelText?.trim() || statusLabel(status)
+  if (status === "approved") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+        <CheckCircle2 className="size-3.5" />
+        {label}
+      </span>
+    )
+  }
+  if (status === "rejected") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-medium text-red-700 dark:text-red-400">
+        <XCircle className="size-3.5" />
+        {label}
+      </span>
+    )
+  }
+  if (status === "review" || status === "needs_correction") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-800 dark:text-sky-300">
+        <AlertCircle className="size-3.5" />
+        {label}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+      <Clock className="size-3.5" />
+      {label}
+    </span>
+  )
 }
 
 export default function BecomeExpertApplyPage() {
@@ -93,6 +193,9 @@ export default function BecomeExpertApplyPage() {
 
   const [step, setStep] = React.useState(1)
   const [form, setForm] = React.useState<FormData>(initialForm)
+  const [existing, setExisting] = React.useState<ExpertApplication | null>(null)
+  const [loadingApplication, setLoadingApplication] = React.useState(true)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
 
   const { categories, isLoading: taxLoading } = useTaxonomy()
 
@@ -106,6 +209,15 @@ export default function BecomeExpertApplyPage() {
     [subcategories, form.subcategoryId]
   )
 
+  const canEdit = !existing || existing.status !== "approved"
+
+  const isUpdate =
+    existing != null &&
+    (existing.status === "pending" ||
+      existing.status === "review" ||
+      existing.status === "needs_correction" ||
+      existing.status === "rejected")
+
   const { mutate, isLoading, error } = useMutation(
     (data: Parameters<typeof submitExpertApplication>[1]) =>
       submitExpertApplication(token!, data),
@@ -118,14 +230,46 @@ export default function BecomeExpertApplyPage() {
       router.replace("/dashboard")
       return
     }
-    if (!token) router.replace("/login")
+    if (!token) {
+      router.replace(`/login?redirect=${encodeURIComponent("/become-an-expert/apply")}`)
+      return
+    }
+
+    let cancelled = false
+    async function load() {
+      setLoadingApplication(true)
+      setLoadError(null)
+      try {
+        const res = await fetchExpertApplication(token!)
+        if (cancelled) return
+        const app = res.data ?? null
+        setExisting(app)
+        if (app) setForm(applicationToForm(app))
+      } catch (e) {
+        if (cancelled) return
+        let message = "Could not load your application."
+        if (e instanceof ApiError) message = e.message
+        else if (e instanceof Error) message = e.message
+        setLoadError(message)
+      } finally {
+        if (!cancelled) setLoadingApplication(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [isHydrated, token, isExpert, router])
 
   const set = (key: keyof FormData, value: unknown) => {
     setForm((p) => {
       const next = { ...p, [key]: value }
-      if (key === "categoryId") { next.subcategoryId = ""; next.skillIds = [] }
-      if (key === "subcategoryId") { next.skillIds = [] }
+      if (key === "categoryId") {
+        next.subcategoryId = ""
+        next.skillIds = []
+      }
+      if (key === "subcategoryId") next.skillIds = []
       return next
     })
   }
@@ -159,7 +303,11 @@ export default function BecomeExpertApplyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (step < TOTAL) { setStep((s) => s + 1); return }
+    if (!canEdit) return
+    if (step < TOTAL) {
+      setStep((s) => s + 1)
+      return
+    }
     await mutate({
       category_id: Number(form.categoryId),
       subcategory_id: Number(form.subcategoryId),
@@ -173,14 +321,33 @@ export default function BecomeExpertApplyPage() {
       education: form.education,
       experience: form.experience,
       portfolio: form.portfolio,
-      avatar: form.avatar,
     })
   }
 
-  if (!isHydrated || isExpert) {
+  if (!isHydrated || isExpert || loadingApplication) {
     return (
       <main className="min-h-screen">
-        <ProgressLoaderScreen className="min-h-screen" label="Loading…" />
+        <ProgressLoaderScreen className="min-h-screen" label="Loading application…" />
+      </main>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-background py-12 sm:py-16">
+        <div className="mx-auto max-w-2xl px-4 sm:px-6">
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle>Expert Application</CardTitle>
+              <CardDescription>{loadError}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button type="button" onClick={() => window.location.reload()}>
+                Try again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     )
   }
@@ -196,11 +363,43 @@ export default function BecomeExpertApplyPage() {
             <ChevronLeft className="size-4" />
             Back
           </Link>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Expert Application</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              {isUpdate ? "Update Expert Application" : "Expert Application"}
+            </h1>
+            {existing && (
+              <ApplicationStatusBadge
+                status={existing.status}
+                statusLabelText={existing.status_label}
+              />
+            )}
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Step {step} of {TOTAL}: {STEPS[step - 1].title}
           </p>
         </div>
+
+        {existing && (
+          <div className="mb-6 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-foreground">Application status</span>
+              <ApplicationStatusBadge
+                status={existing.status}
+                statusLabelText={existing.status_label}
+              />
+            </div>
+            {applicationAdminFeedback(existing) && (
+              <p className="mt-2 text-muted-foreground whitespace-pre-wrap">
+                Admin feedback: {applicationAdminFeedback(existing)}
+              </p>
+            )}
+            {!canEdit && (
+              <p className="mt-2 text-muted-foreground">
+                This application can no longer be edited.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mb-8 flex gap-2" role="tablist" aria-label="Application sections">
           {STEPS.map((s) => {
@@ -228,6 +427,7 @@ export default function BecomeExpertApplyPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
+          <fieldset disabled={!canEdit} className="min-w-0 space-y-0 border-0 p-0">
           {/* Step 1 — Profile */}
           {step === 1 && (
             <Card className="border-border">
@@ -295,16 +495,6 @@ export default function BecomeExpertApplyPage() {
                     value={form.intro_video}
                     onChange={(e) => set("intro_video", e.target.value)}
                     placeholder="https://youtube.com/..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="avatar">Profile Photo <span className="text-muted-foreground">(optional)</span></Label>
-                  <Input
-                    id="avatar"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => set("avatar", e.target.files?.[0] ?? null)}
-                    className="cursor-pointer"
                   />
                 </div>
               </CardContent>
@@ -624,6 +814,7 @@ export default function BecomeExpertApplyPage() {
               )}
             </div>
           )}
+          </fieldset>
 
           <div className="mt-8 flex justify-between">
             <Button
@@ -637,14 +828,14 @@ export default function BecomeExpertApplyPage() {
               Previous
             </Button>
             {step < TOTAL ? (
-              <Button type="submit" className="gap-1">
+              <Button type="submit" className="gap-1" disabled={!canEdit}>
                 Next
                 <ChevronRight className="size-4" />
               </Button>
             ) : (
-              <Button type="submit" disabled={isLoading} className="gap-1">
+              <Button type="submit" disabled={isLoading || !canEdit} className="gap-1">
                 {isLoading && <ProgressLoader size="sm" />}
-                Submit Application
+                {isUpdate ? "Update Application" : "Submit Application"}
               </Button>
             )}
           </div>

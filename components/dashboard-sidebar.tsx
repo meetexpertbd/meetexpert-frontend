@@ -5,19 +5,13 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
-  Users,
   Calendar,
   CalendarClock,
-  MessageCircle,
-  FileText,
-  Star,
-  FileStack,
   Settings,
   LogOut,
   Bell,
   Menu,
   X,
-  ClipboardList,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { logoutRequest } from "@/lib/auth-api"
@@ -28,7 +22,6 @@ type NavItem = {
   href: string
   label: string
   icon: React.ComponentType<{ className?: string }>
-  badge?: number
   roles?: Array<"user" | "expert">
 }
 
@@ -47,12 +40,6 @@ const navSections: NavSection[] = [
         icon: LayoutDashboard,
         roles: ["expert"],
       },
-      {
-        href: "/dashboard/mentees",
-        label: "Mentees",
-        icon: Users,
-        roles: ["expert"],
-      },
     ],
   },
   {
@@ -68,30 +55,6 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: "Activity",
-    items: [
-      { href: "/dashboard/messages", label: "Messages", icon: MessageCircle, badge: 3 },
-      {
-        href: "/dashboard/invoices",
-        label: "Invoices",
-        icon: FileText,
-        roles: ["expert"],
-      },
-      { href: "/dashboard/reviews", label: "Reviews", icon: Star },
-      {
-        href: "/dashboard/blogs",
-        label: "Blogs",
-        icon: FileStack,
-        roles: ["expert"],
-      },
-      {
-        href: "/dashboard/application",
-        label: "Application",
-        icon: ClipboardList,
-      },
-    ],
-  },
-  {
     label: "Account",
     items: [
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -103,10 +66,7 @@ const USER_HOME = "/dashboard/bookings"
 
 const USER_ALLOWED = new Set([
   "/dashboard/bookings",
-  "/dashboard/messages",
-  "/dashboard/reviews",
   "/dashboard/settings",
-  "/dashboard/application",
 ])
 
 function isUserAllowedPath(pathname: string) {
@@ -255,11 +215,6 @@ export function DashboardSidebar() {
                         >
                           <Icon className="size-4 shrink-0" />
                           <span className="flex-1">{item.label}</span>
-                          {item.badge !== undefined && (
-                            <span className="flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-                              {item.badge}
-                            </span>
-                          )}
                         </Link>
                       </li>
                     )

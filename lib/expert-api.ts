@@ -527,6 +527,7 @@ export type ExpertApplicationDocument = {
 
 export type ExpertApplicationStatus =
   | "pending"
+  | "review"
   | "needs_correction"
   | "approved"
   | "rejected"
@@ -534,6 +535,7 @@ export type ExpertApplicationStatus =
 export type ExpertApplication = {
   id: number
   status: ExpertApplicationStatus
+  status_label?: string | null
   professional_headline: string
   bio: string
   years_of_experience: number
@@ -547,13 +549,26 @@ export type ExpertApplication = {
   education: EducationEntry[] | null
   experience: ExperienceEntry[] | null
   portfolio: PortfolioEntry[] | null
+  /** Admin message to the applicant (API field name). */
   admin_feedback?: string | null
+  /** Legacy alias some payloads may still send — prefer admin_feedback. */
+  note?: string | null
   reviewed_at?: string | null
   category: ExpertApplicationRef
   subcategory: ExpertApplicationRef
   skills: ExpertApplicationRef[]
   created_at?: string
   updated_at?: string
+}
+
+export function applicationAdminFeedback(
+  app: Pick<ExpertApplication, "admin_feedback" | "note"> | null | undefined
+): string | null {
+  if (!app) return null
+  const value = app.admin_feedback ?? app.note
+  if (value == null) return null
+  const trimmed = String(value).trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 export type ExpertApplicationInput = {
@@ -625,6 +640,27 @@ export type ExpertAvailability = {
 
 export type ExpertDetailEntity = ExpertEntity & {
   days?: AvailabilityDay[]
+}
+
+export type ExpertDetailsInput = ExpertApplicationInput
+
+export type MyExpertDetails = ExpertDetailEntity & {
+  status?: string
+}
+
+export async function fetchMyExpertDetails(token: string) {
+  return get<ApiEnvelope<MyExpertDetails>>("/expert/details", { token })
+}
+
+export async function updateMyExpertDetails(
+  token: string,
+  input: ExpertDetailsInput
+) {
+  return postForm<ApiEnvelope<MyExpertDetails>>(
+    "/expert/details",
+    buildFormData(input),
+    { token }
+  )
 }
 
 export type ExpertAvailableSlot = {

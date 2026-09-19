@@ -59,7 +59,6 @@ type AvatarSource = {
   avatar?: string | null
   avatar_url?: string | null
   profile?: { avatar?: string | null; avatar_url?: string | null } | null
-  expert_profile?: { avatar?: string | null; avatar_url?: string | null } | null
 }
 
 function firstAvatar(...values: Array<string | null | undefined>) {
@@ -73,12 +72,10 @@ export function getProfileAvatar(user: AvatarSource | null | undefined) {
   if (!user) return null
   return resolveAvatarUrl(
     firstAvatar(
-      user.avatar_url,
-      user.avatar,
       user.profile?.avatar_url,
       user.profile?.avatar,
-      user.expert_profile?.avatar_url,
-      user.expert_profile?.avatar
+      user.avatar_url,
+      user.avatar
     )
   )
 }
