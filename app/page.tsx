@@ -12,10 +12,9 @@ export default function Page() {
   return (
     <main>
       <Hero />
-
       <FeatureExperts />
-      <HowItWork />
       <CategoryShowcase />
+      <HowItWork />
       <WhyChooseUs />
       <HowVerified />
       <UserReview />

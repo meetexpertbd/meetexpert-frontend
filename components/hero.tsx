@@ -1,26 +1,16 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  ArrowRight,
-  BadgeCheck,
-  CalendarCheck,
-  Layers,
-  Lock,
-  Search,
-  ShieldCheck,
-  Star,
-  UserPlus,
-  Video,
-} from "lucide-react"
+import { ArrowRight, BadgeCheck, Layers, Lock, Search, ShieldCheck, Star, UserPlus, Video } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useGet } from "@/hooks/use-get"
 import { useTaxonomy } from "@/hooks/use-taxonomy"
 import { EXPERTS_API_URL, type ExpertEntity } from "@/lib/expert-api"
-import { CATEGORY_PAGES } from "@/lib/category-pages"
+import { CATEGORY_PAGES, type CategoryPage } from "@/lib/category-pages"
 import type { ApiEnvelope } from "@/lib/auth-api"
 import {
   PLACEHOLDER_AVATAR,
@@ -45,49 +35,132 @@ function SafeImg({ src, alt, className }: { src: string; alt: string; className?
   )
 }
 
-function FeaturedExpertCard({ expert }: { expert: ExpertItem }) {
+const TILE_TONES: Record<string, { icon: string; glow: string; ring: string; text: string; chip: string }> = {
+  "/lawyer": {
+    icon: "bg-amber-400 text-amber-950",
+    glow: "shadow-amber-400/50",
+    ring: "ring-amber-300",
+    text: "text-amber-300",
+    chip: "border-amber-300/50 bg-amber-300/15 text-white",
+  },
+  "/study-abroad": {
+    icon: "bg-sky-400 text-sky-950",
+    glow: "shadow-sky-400/50",
+    ring: "ring-sky-300",
+    text: "text-sky-300",
+    chip: "border-sky-300/50 bg-sky-300/15 text-white",
+  },
+  "/religious-scholar": {
+    icon: "bg-emerald-400 text-emerald-950",
+    glow: "shadow-emerald-400/50",
+    ring: "ring-emerald-300",
+    text: "text-emerald-300",
+    chip: "border-emerald-300/50 bg-emerald-300/15 text-white",
+  },
+}
+
+const ROTATE_MS = 3500
+
+function CategoryTile({
+  page,
+  active,
+  onActivate,
+  className,
+}: {
+  page: CategoryPage
+  active: boolean
+  onActivate: () => void
+  className?: string
+}) {
+  const tone = TILE_TONES[page.href]
+  const mosaic = page.images.length > 1
+  return (
+    <Link
+      href={page.href}
+      onMouseEnter={onActivate}
+      onFocus={onActivate}
+      className={cn(
+        "group relative isolate flex flex-col justify-between overflow-hidden rounded-2xl bg-slate-800 p-2.5 text-white shadow-xl ring-1 ring-white/10 outline-none transition-all duration-500 sm:rounded-3xl sm:p-4",
+        active && cn("ring-2 ring-offset-2 ring-offset-[#071427]", tone?.ring),
+        className
+      )}
+    >
+      <div className={cn("absolute inset-0 -z-10 grid", mosaic && "grid-cols-2 grid-rows-2 gap-px")}>
+        {page.images.map((src, i) => (
+          <div key={src} className="relative overflow-hidden">
+            <Image
+              src={src}
+              alt={i === 0 ? page.imageAlt : ""}
+              fill
+              sizes="(min-width: 1024px) 25vw, 33vw"
+              priority={!mosaic}
+              className={cn(
+                "object-cover transition-transform duration-700",
+                active ? "scale-105" : "scale-100 group-hover:scale-105"
+              )}
+            />
+          </div>
+        ))}
+      </div>
+      <div
+        className={cn(
+          "absolute inset-0 -z-10 bg-linear-to-t from-slate-950/95 via-slate-950/35 to-slate-950/10 transition-opacity duration-500",
+          active ? "opacity-80" : "opacity-100"
+        )}
+      />
+
+      <span
+        className={cn(
+          "relative flex size-8 items-center justify-center rounded-xl shadow-lg transition-transform duration-500 sm:size-11 sm:rounded-2xl",
+          tone?.icon,
+          tone?.glow,
+          active && "scale-110"
+        )}
+      >
+        {active && (
+          <span className={cn("absolute inset-0 animate-ping rounded-[inherit] opacity-40 motion-reduce:animate-none", tone?.icon)} />
+        )}
+        <page.icon className="relative size-4 sm:size-5" />
+      </span>
+
+      <div>
+        <p className="text-xs font-bold leading-tight sm:text-lg">{page.label}</p>
+        <p className={cn("text-[10px] font-medium sm:text-xs", tone?.text)}>{page.bn}</p>
+        <span
+          className={cn(
+            "mt-2 hidden items-center gap-1 text-xs font-semibold transition-all duration-500 sm:inline-flex",
+            active ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
+          )}
+        >
+          Explore <ArrowRight className="size-3.5" />
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+function FloatingExpert({ expert }: { expert: ExpertItem }) {
   const price = formatSlotPrice(expert.slotPrice)
   return (
     <Link
       href={expertProfileHref(expert)}
-      className="group relative block overflow-hidden rounded-3xl bg-slate-800 shadow-2xl ring-1 ring-white/10"
+      className="animate-hero-float-slow absolute -bottom-6 -right-4 z-10 hidden w-64 items-center gap-3 rounded-2xl border border-white/15 bg-slate-900/85 p-3 text-white shadow-2xl backdrop-blur-md transition-colors hover:border-white/30 lg:flex"
     >
-      <div className="aspect-square lg:aspect-4/5">
-        <SafeImg
-          src={expert.image}
-          alt={expert.name}
-          className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
-        />
-      </div>
-      <div className="absolute inset-0 bg-linear-to-t from-slate-950/95 via-slate-950/20 to-transparent" />
-      <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/15 bg-white/10 p-4 text-white backdrop-blur-md">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate text-base font-semibold">{expert.name}</p>
-            <p className="truncate text-xs text-white/75">
-              {expert.headline || expert.subcategory || expert.category}
-            </p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold">
-            <BadgeCheck className="size-3" />
-            Verified
-          </span>
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-sm">
-          <div className="flex items-center gap-3 text-white/85">
-            {expert.rating != null && expert.rating > 0 && (
-              <span className="inline-flex items-center gap-1 text-amber-300">
-                <Star className="size-3.5 fill-amber-300" />
-                {expert.rating}
-              </span>
-            )}
-            {expert.yearsExperience > 0 && <span>{expert.yearsExperience}+ yrs exp.</span>}
-            {price && <span className="font-semibold text-white">{price}</span>}
-          </div>
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-sky-300">
-            Book
-            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-          </span>
+      <SafeImg src={expert.image} alt={expert.name} className="size-12 shrink-0 rounded-xl object-cover" />
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1 truncate text-sm font-semibold">
+          {expert.name}
+          <BadgeCheck className="size-3.5 shrink-0 text-emerald-400" />
+        </p>
+        <p className="truncate text-[11px] text-slate-400">{expert.headline || expert.subcategory || expert.category}</p>
+        <div className="mt-1 flex items-center gap-2 text-[11px]">
+          {expert.rating != null && expert.rating > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-amber-300">
+              <Star className="size-3 fill-amber-300" />
+              {expert.rating}
+            </span>
+          )}
+          {price && <span className="font-semibold text-sky-300">{price}</span>}
         </div>
       </div>
     </Link>
@@ -100,8 +173,16 @@ export function Hero() {
   const isExpert = user?.user_type === "expert"
   const { categories } = useTaxonomy()
   const [query, setQuery] = React.useState("")
+  const [active, setActive] = React.useState(0)
+  const [paused, setPaused] = React.useState(false)
 
-  const { data, isLoading } = useGet<ApiEnvelope<ExpertEntity[]>>(`${EXPERTS_API_URL}?per_page=8`)
+  React.useEffect(() => {
+    if (paused) return
+    const id = window.setInterval(() => setActive((i) => (i + 1) % CATEGORY_PAGES.length), ROTATE_MS)
+    return () => window.clearInterval(id)
+  }, [paused])
+
+  const { data } = useGet<ApiEnvelope<ExpertEntity[]>>(`${EXPERTS_API_URL}?per_page=8`)
   const experts = React.useMemo(() => asExpertList(data?.data).map(mapExpertToItem), [data])
 
   const featured = experts[0]
@@ -179,16 +260,30 @@ export function Hero() {
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-slate-400">Popular:</span>
-              {CATEGORY_PAGES.map((p) => (
-                <Link
-                  key={p.href}
-                  href={p.href}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white"
-                >
-                  <p.icon className="size-3.5 text-sky-300" />
-                  {p.label}
-                </Link>
-              ))}
+              {CATEGORY_PAGES.map((p, i) => {
+                const tone = TILE_TONES[p.href]
+                const isActive = active === i
+                return (
+                  <Link
+                    key={p.href}
+                    href={p.href}
+                    onMouseEnter={() => {
+                      setActive(i)
+                      setPaused(true)
+                    }}
+                    onMouseLeave={() => setPaused(false)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-all duration-300",
+                      isActive
+                        ? tone?.chip
+                        : "border-white/10 bg-white/5 text-slate-300 hover:border-white/25 hover:text-white"
+                    )}
+                  >
+                    <p.icon className={cn("size-3.5", tone?.text)} />
+                    {p.label}
+                  </Link>
+                )
+              })}
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -233,38 +328,33 @@ export function Hero() {
             )}
           </div>
 
-          <div className="relative mx-auto w-full max-w-sm lg:max-w-md">
-            <div className="absolute -inset-4 -z-10 rounded-[2.5rem] bg-linear-to-br from-sky-400/30 via-indigo-500/20 to-emerald-400/20 blur-2xl" />
-            {isLoading && !featured ? (
-              <div className="flex aspect-4/5 items-center justify-center rounded-3xl bg-white/5 ring-1 ring-white/10">
-                <Video className="size-10 text-slate-400" />
-              </div>
-            ) : featured ? (
-              <FeaturedExpertCard expert={featured} />
-            ) : (
-              <div className="flex aspect-4/5 flex-col items-center justify-center gap-3 rounded-3xl bg-white/5 p-8 text-center ring-1 ring-white/10">
-                <ShieldCheck className="size-12 text-sky-300" />
-                <p className="text-sm text-slate-300">Verified experts are joining soon.</p>
-              </div>
-            )}
+          <div
+            className="relative w-full"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+          >
+            <div className="absolute -inset-6 -z-10 rounded-[3rem] bg-linear-to-br from-amber-400/20 via-sky-500/25 to-emerald-400/20 blur-3xl" />
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:h-128 lg:grid-cols-2 lg:grid-rows-2">
+              {CATEGORY_PAGES.map((page, i) => (
+                <CategoryTile
+                  key={page.href}
+                  page={page}
+                  active={active === i}
+                  onActivate={() => setActive(i)}
+                  className={cn("aspect-3/4 lg:aspect-auto", i === 0 && "lg:row-span-2")}
+                />
+              ))}
+            </div>
 
-            <div className="animate-hero-float-slow absolute -left-6 top-10 hidden items-center gap-2.5 rounded-2xl border border-white/15 bg-slate-900/80 p-3 pr-4 shadow-xl backdrop-blur-md sm:flex">
+            {featured && <FloatingExpert expert={featured} />}
+
+            <div className="animate-hero-float absolute -left-6 top-1/2 z-10 hidden -translate-y-1/2 items-center gap-2.5 rounded-2xl border border-white/15 bg-slate-900/85 p-3 pr-4 shadow-xl backdrop-blur-md lg:flex">
               <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
                 <ShieldCheck className="size-5" />
               </span>
               <div>
-                <p className="text-xs font-semibold">Verified profile</p>
+                <p className="text-xs font-semibold">Verified experts</p>
                 <p className="text-[11px] text-slate-400">ID &amp; credentials reviewed</p>
-              </div>
-            </div>
-
-            <div className="animate-hero-float absolute -right-5 top-1/2 hidden items-center gap-2.5 rounded-2xl border border-white/15 bg-slate-900/80 p-3 pr-4 shadow-xl backdrop-blur-md sm:flex">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-sky-500/20 text-sky-300">
-                <CalendarCheck className="size-5" />
-              </span>
-              <div>
-                <p className="text-xs font-semibold">Session booked</p>
-                <p className="text-[11px] text-slate-400">Private 1:1 video call</p>
               </div>
             </div>
           </div>
