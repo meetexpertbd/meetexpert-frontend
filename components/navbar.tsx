@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
-import { ArrowRight, ChevronDown, Menu, Moon, Sun, User, LayoutDashboard, LogOut, X, LogIn } from "lucide-react"
+import { ArrowRight, ChevronDown, ChevronRight, Menu, Moon, Sun, User, LayoutDashboard, LogOut, X, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { logoutRequest } from "@/lib/auth-api"
@@ -71,6 +71,20 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
     setCategoriesOpen(false)
     setMobileOpen(false)
   }, [pathname])
+
+  async function handleLogout() {
+    if (token) {
+      try {
+        await logoutRequest(token)
+      } catch {
+        // clear local session anyway
+      }
+    }
+    logout()
+    setMenuOpen(false)
+    setMobileOpen(false)
+    router.push("/")
+  }
 
 
   return (
@@ -209,18 +223,7 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
                     type="button"
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background text-left"
                     role="menuitem"
-                    onClick={async () => {
-                      if (token) {
-                        try {
-                          await logoutRequest(token)
-                        } catch {
-                          // ignore
-                        }
-                      }
-                      logout()
-                      setMenuOpen(false)
-                      router.push("/")
-                    }}
+                    onClick={handleLogout}
                   >
                     <LogOut className="size-4" />
                     Logout
@@ -238,7 +241,14 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
         </div>
         <div className="flex items-center gap-1.5 md:hidden">
           {isLoggedIn && user ? (
-            <UserAvatar name={user.name} src={user.avatar} size="xs" />
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open account menu"
+              className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <UserAvatar name={user.name} src={user.avatar} size="xs" />
+            </button>
           ) : null}
           <button
             type="button"
@@ -290,59 +300,74 @@ function Navbar({ className, ...props }: React.ComponentProps<"header">) {
                 </span>
               </Link>
             ))}
-            <div className="mt-2 flex items-center gap-2 border-t border-border pt-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-              >
-                {resolvedTheme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                <span className="ml-2">Theme</span>
-              </Button>
+            <div className="mt-3 border-t border-border pt-3">
               {isLoggedIn && user ? (
-                <>
-                  <div className="flex items-center gap-2 px-3 py-1">
-                    <UserAvatar name={user.name} src={user.avatar} size="sm" />
-                    <span className="truncate text-sm font-medium">{user.name}</span>
+                <div className="rounded-2xl border border-border bg-muted/40 p-2">
+                  <div className="flex items-center gap-3 px-2 py-2">
+                    <UserAvatar name={user.name} src={user.avatar} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground">{user.name || "Account"}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {user.email || (isExpert ? "Expert" : "User")}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
+                      {isExpert ? "Expert" : "User"}
+                    </span>
                   </div>
-                  <Link href="/profile" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                    Profile
-                  </Link>
-                  <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 text-sm font-medium hover:bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                    Dashboard
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={async () => {
-                      if (token) {
-                        try {
-                          await logoutRequest(token)
-                        } catch {
-                          // ignore
-                        }
-                      }
-                      logout()
-                      setMobileOpen(false)
-                      router.push("/")
-                    }}
-                  >
-                    Logout
-                  </Button>
-                </>
+                  <div className="mt-1 grid gap-0.5">
+                    {[
+                      { href: "/profile", label: "Profile", Icon: User },
+                      { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+                    ].map(({ href, label, Icon }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-ring",
+                          isActivePath(pathname, href) && "bg-background"
+                        )}
+                      >
+                        <Icon className="size-4 text-muted-foreground" />
+                        <span className="flex-1">{label}</span>
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      </Link>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-destructive outline-none hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <LogOut className="size-4" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <Button
-                  variant="default"
-                  size="sm"
+                  className="w-full"
                   onClick={() => {
                     setMobileOpen(false)
                     router.push("/login")
                   }}
                 >
                   Login
+                  <LogIn className="size-4" />
                 </Button>
               )}
+              <button
+                type="button"
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {resolvedTheme === "dark" ? (
+                  <Sun className="size-4 text-muted-foreground" />
+                ) : (
+                  <Moon className="size-4 text-muted-foreground" />
+                )}
+                {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
+              </button>
             </div>
           </div>
         </div>
