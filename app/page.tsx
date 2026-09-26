@@ -1,5 +1,5 @@
 import { Hero } from "@/components/hero"
-import { ExploreCategories } from "@/components/explore-categories"
+import { CategoryShowcase } from "@/components/category-showcase"
 import { FeatureExperts } from "@/components/feature-experts"
 import { HowVerified } from "@/components/how-verified"
 import HowItWork from "@/components/HowItWork"
@@ -12,12 +12,12 @@ export default function Page() {
   return (
     <main>
       <Hero />
-     
+
       <FeatureExperts />
-      <ExploreCategories />
-      <HowVerified />
       <HowItWork />
+      <CategoryShowcase />
       <WhyChooseUs />
+      <HowVerified />
       <UserReview />
       <FAQ />
       <FinalCta />

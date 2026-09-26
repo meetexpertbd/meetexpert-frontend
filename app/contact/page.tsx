@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Mail, Phone, MapPin, Send, CheckCircle2 } from "lucide-react"
+import { Mail, Phone, MapPin, Send, CheckCircle2, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -22,9 +22,38 @@ const MESSAGE_MAX = 5000
 const PHONE_MAX = 32
 
 const contactInfo = [
-  { icon: Mail, label: "Email", value: "support@expert.com" },
-  { icon: Phone, label: "Phone", value: "+1 (555) 123-4567" },
-  { icon: MapPin, label: "Address", value: "123 Expert Street, City, Country" },
+  {
+    icon: Mail,
+    label: "Email",
+    value: "meetexpertbd@gmail.com",
+    href: "mailto:meetexpertbd@gmail.com",
+    desc: "Drop us a mail anytime",
+    iconColor: "text-blue-500"
+  },
+  {
+    icon: MessageCircle,
+    label: "WhatsApp",
+    value: "+8801329640884",
+    href: "https://wa.me/8801329640884",
+    desc: "Chat instantly on WhatsApp",
+    iconColor: "text-green-500"
+  },
+  {
+    icon: Phone,
+    label: "Phone",
+    value: "+8801329640884",
+    href: "tel:+8801329640884",
+    desc: "Call us for urgent support",
+    iconColor: "text-cyan-500"
+  },
+  {
+    icon: MapPin,
+    label: "Address",
+    value: "70/A Lake Circus, Kalabagan, Dhaka-1205, Bangladesh",
+    href: "https://maps.google.com/?q=70/A+Lake+Circus,+Kalabagan,+Dhaka-1205,+Bangladesh",
+    desc: "Visit our office, we’re happy to meet",
+    iconColor: "text-orange-500"
+  }
 ]
 
 type FormState = {
@@ -128,34 +157,34 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen">
-      <section className="border-b border-border bg-muted/20 py-12 sm:py-16">
+      <section className="border-b border-border bg-muted/10 py-12 sm:py-16">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h1 className="text-4xl font-extrabold tracking-tight text-primary sm:text-5xl">
             Contact Us
           </h1>
           <p className="mt-4 text-lg text-muted-foreground">
-            Have a question or feedback? Send us a message and we&apos;ll get back to you soon.
+            We’re here to help. Reach out for support, suggestions, or just to say hello!
           </p>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
         <div className="grid gap-10 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <Card>
+            <Card className="rounded-xl shadow bg-white border border-primary/20">
               <CardContent className="p-6 sm:p-8">
                 {sent ? (
                   <div className="py-8 text-center">
-                    <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <CheckCircle2 className="size-7" />
                     </div>
-                    <p className="font-medium text-foreground">Thanks for your message.</p>
+                    <p className="font-semibold text-lg text-foreground">Thanks for your message.</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {successMessage}
                     </p>
                     <Button
                       variant="outline"
-                      className="mt-4"
+                      className="mt-4 border-primary text-primary"
                       onClick={resetForm}
                     >
                       Send another message
@@ -170,7 +199,7 @@ export default function ContactPage() {
                     )}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
+                        <Label htmlFor="name" className="text-base text-primary">Name</Label>
                         <Input
                           id="name"
                           name="name"
@@ -180,11 +209,12 @@ export default function ContactPage() {
                           required
                           maxLength={255}
                           aria-invalid={Boolean(fieldErrors.name)}
+                          className="rounded-md border bg-white focus:border-primary focus:ring-primary"
                         />
                         <FieldError message={fieldErrors.name} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="phone">Phone</Label>
+                        <Label htmlFor="phone" className="text-base text-primary">Phone</Label>
                         <Input
                           id="phone"
                           name="phone"
@@ -195,13 +225,14 @@ export default function ContactPage() {
                           required
                           maxLength={PHONE_MAX}
                           aria-invalid={Boolean(fieldErrors.phone)}
+                          className="rounded-md border bg-white focus:border-primary focus:ring-primary"
                         />
                         <FieldError message={fieldErrors.phone} />
                       </div>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="email">
+                        <Label htmlFor="email" className="text-base text-primary">
                           Email <span className="font-normal text-muted-foreground">(optional)</span>
                         </Label>
                         <Input
@@ -212,11 +243,12 @@ export default function ContactPage() {
                           onChange={(e) => update("email", e.target.value)}
                           placeholder="you@example.com"
                           aria-invalid={Boolean(fieldErrors.email)}
+                          className="rounded-md border bg-white focus:border-primary focus:ring-primary"
                         />
                         <FieldError message={fieldErrors.email} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="preferred_language">
+                        <Label htmlFor="preferred_language" className="text-base text-primary">
                           Preferred language{" "}
                           <span className="font-normal text-muted-foreground">(optional)</span>
                         </Label>
@@ -231,6 +263,7 @@ export default function ContactPage() {
                             )
                           }
                           aria-invalid={Boolean(fieldErrors.preferred_language)}
+                          className="rounded-md border bg-white focus:border-primary focus:ring-primary"
                         >
                           <option value="">Select language</option>
                           <option value="bn">বাংলা</option>
@@ -240,7 +273,7 @@ export default function ContactPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="subject">Subject</Label>
+                      <Label htmlFor="subject" className="text-base text-primary">Subject</Label>
                       <Input
                         id="subject"
                         name="subject"
@@ -250,12 +283,13 @@ export default function ContactPage() {
                         required
                         maxLength={255}
                         aria-invalid={Boolean(fieldErrors.subject)}
+                        className="rounded-md border bg-white focus:border-primary focus:ring-primary"
                       />
                       <FieldError message={fieldErrors.subject} />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <Label htmlFor="message">Message</Label>
+                        <Label htmlFor="message" className="text-base text-primary">Message</Label>
                         <span
                           className={cn(
                             "text-xs text-muted-foreground",
@@ -275,10 +309,15 @@ export default function ContactPage() {
                         required
                         maxLength={MESSAGE_MAX}
                         aria-invalid={Boolean(fieldErrors.message)}
+                        className="rounded-md border bg-white focus:border-primary focus:ring-primary"
                       />
                       <FieldError message={fieldErrors.message} />
                     </div>
-                    <Button type="submit" className="gap-2" disabled={submitting}>
+                    <Button
+                      type="submit"
+                      className="gap-2 bg-primary text-white hover:bg-primary/90 rounded-md shadow"
+                      disabled={submitting}
+                    >
                       <Send className="size-4" />
                       {submitting ? "Sending…" : "Send message"}
                     </Button>
@@ -288,24 +327,38 @@ export default function ContactPage() {
             </Card>
           </div>
 
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Get in touch</h2>
-            {contactInfo.map((item) => {
-              const Icon = item.icon
-              return (
-                <Card key={item.label}>
-                  <CardContent className="flex gap-4 p-4">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Icon className="size-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{item.label}</p>
-                      <p className="mt-0.5 text-sm text-muted-foreground">{item.value}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+          <div className="space-y-8">
+            <h2 className="text-xl font-bold tracking-tight text-primary">
+              Get in touch
+            </h2>
+            <div className="flex flex-col gap-5">
+              {contactInfo.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Card
+                    key={item.label}
+                    className="shadow border border-primary/10 rounded-xl bg-white transition hover:shadow-md"
+                  >
+                    <CardContent className="flex gap-4 items-center p-5">
+                      <div className={`flex size-12 items-center justify-center rounded-xl bg-primary/10 ${item.iconColor}`}>
+                        <Icon className={`size-6 ${item.iconColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={item.href}
+                          target={item.label === "Address" ? "_blank" : undefined}
+                          rel={item.label === "Address" ? "noopener noreferrer" : undefined}
+                          className="font-semibold text-base break-all text-primary hover:underline"
+                        >
+                          {item.value}
+                        </a>
+                        <p className="text-xs mt-1 text-muted-foreground">{item.desc}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
           </div>
         </div>
       </section>

@@ -126,7 +126,11 @@ function parseDateKey(date: string): Date {
 function formatCircleDate(date: string): string {
   const d = parseDateKey(date)
   const day = String(d.getDate()).padStart(2, "0")
-  return `${day}-${MONTH_SHORT[d.getMonth()]}`
+  return `${day}`
+}
+function formatCircleMonth(date: string): string {
+  const d = parseDateKey(date)
+  return `${MONTH_SHORT[d.getMonth()]}`
 }
 
 function upcomingDates(daysAhead = 14): string[] {
@@ -324,7 +328,7 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
     }
 
     return pool.slice(start, start + 7)
-  }, [ slots, slotsLoaded])
+  }, [slots, slotsLoaded])
 
   const slotsByDate = React.useMemo(() => {
     const map = new Map<string, BookableSlot[]>()
@@ -668,14 +672,14 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                   aria-pressed={isSelected}
                   aria-label={`${DAY_LABELS[d.getDay()]} ${formatCircleDate(date)}`}
                 >
-                  {isSelected && (
+                  {/* {isSelected && (
                     <span className="absolute -top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
                       <Check className="size-3 stroke-3" />
                     </span>
-                  )}
+                  )} */}
                   <span
                     className={cn(
-                      "flex size-18 flex-col items-center justify-center rounded-lg border text-center transition-colors",
+                      "flex px-3 py-3 flex-col items-center justify-center rounded-bl-4xl rounded-t-4xl rounded-tr-4xl border-2 text-center transition-colors",
                       isSelected
                         ? "border-primary bg-primary/10 text-foreground"
                         : hasSlots
@@ -683,16 +687,32 @@ export function ExpertProfileClient({ expert }: { expert: ExpertDetail }) {
                           : "border-dashed border-border bg-muted/30 text-muted-foreground"
                     )}
                   >
-                    <span className="text-[11px] font-semibold uppercase tracking-wide">
+
+                    <span className="text-md font-medium">{formatCircleMonth(date)}</span>
+                    <span className="text-lg font-bold">{formatCircleDate(date)}</span>
+                    <span className="my-0.5 h-px w-8 bg-border" />
+                    <span className={`text-md uppercase tracking-wide ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted/30 text-muted-foreground"} rounded-full p-2`}>
                       {DAY_LABELS_SHORT[d.getDay()]}
                     </span>
-                    <span className="my-0.5 h-px w-8 bg-border" />
-                    <span className="text-[11px] font-medium">{formatCircleDate(date)}</span>
+                   
                   </span>
                 </button>
               )
             })}
           </div>
+
+          {selectedDate && (
+            <div className="flex items-center">
+              <div className="inline-flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Selected date:</span>
+                <span className="text-base font-semibold text-primary">
+                  {formatCircleMonth(selectedDate)} {formatCircleDate(selectedDate)}, {DAY_LABELS[parseDateKey(selectedDate).getDay()]}
+                </span>
+              </div>
+            </div>
+          )}
+
+     
 
           <div className="space-y-3">
             {slotsForSelectedDate.length === 0 ? (

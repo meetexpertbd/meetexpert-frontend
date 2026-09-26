@@ -1,7 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown } from "lucide-react"
+import Link from "next/link"
+import { ArrowRight, ChevronDown, LifeBuoy, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { SectionHeading } from "@/components/section-heading"
 import { cn } from "@/lib/utils"
 
 const faqs = [
@@ -63,59 +66,82 @@ const faqs = [
   },
 ]
 
+const INITIAL_VISIBLE = 7
+
 function FAQ() {
   const [openIndex, setOpenIndex] = React.useState<number | null>(0)
+  const [showAll, setShowAll] = React.useState(false)
+  const visible = showAll ? faqs : faqs.slice(0, INITIAL_VISIBLE)
 
   return (
-    <section className="py-16 sm:py-20">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-center text-sm font-medium text-primary">
-          — Frequently Asked —
-        </p>
-        <h2 className="mb-10 text-center text-2xl font-bold tracking-tight sm:text-3xl">
-          FAQ
-        </h2>
+    <section className="py-16 sm:py-20 lg:py-24">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <SectionHeading
+            eyebrow="Frequently asked"
+            title="Questions? We've got answers."
+            description="সাধারণ প্রশ্নের উত্তর এখানে। আর কিছু জানতে চাইলে সরাসরি যোগাযোগ করুন।"
+          />
+          <div className="mt-8 rounded-3xl border border-border bg-muted/40 p-6">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <LifeBuoy className="size-5" />
+            </span>
+            <p className="mt-4 font-semibold text-foreground">Still have questions?</p>
+            <p className="mt-1 text-sm text-muted-foreground">Our support team usually replies within a few hours.</p>
+            <Button className="mt-4 rounded-full" asChild>
+              <Link href="/contact">
+                Contact support <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 space-y-2">
-          {faqs.map((faq, index) => {
-            const isOpen = openIndex === index
-            return (
-              <div
-                key={index}
-                className={cn(
-                  "overflow-hidden rounded-xl border border-border bg-card transition-colors",
-                  isOpen && "border-primary/30 bg-primary/5"
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-xl"
-                  aria-expanded={isOpen}
-                >
-                  <span className="flex-1">{faq.q}</span>
-                  <ChevronDown
+        <div>
+          <div className="divide-y divide-border overflow-hidden rounded-3xl border border-border bg-card">
+            {visible.map((faq, index) => {
+              const isOpen = openIndex === index
+              return (
+                <div key={faq.q} className={cn("transition-colors", isOpen && "bg-primary/3")}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenIndex(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left text-sm font-medium text-foreground outline-none focus-visible:bg-muted sm:px-6 sm:text-base"
+                    aria-expanded={isOpen}
+                  >
+                    <span className="flex-1">{faq.q}</span>
+                    <span
+                      className={cn(
+                        "flex size-7 shrink-0 items-center justify-center rounded-full border border-border transition-all duration-200",
+                        isOpen && "rotate-45 border-primary bg-primary text-primary-foreground"
+                      )}
+                    >
+                      <Plus className="size-4" />
+                    </span>
+                  </button>
+                  <div
                     className={cn(
-                      "size-5 shrink-0 text-muted-foreground transition-transform duration-200",
-                      isOpen && "rotate-180"
+                      "grid transition-[grid-template-rows] duration-200 ease-out",
+                      isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
                     )}
-                  />
-                </button>
-                <div
-                  className={cn(
-                    "grid transition-[grid-template-rows] duration-200 ease-out",
-                    isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                  )}
-                >
-                  <div className="overflow-hidden">
-                    <p className="border-t border-border px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-                      {faq.a}
-                    </p>
+                  >
+                    <div className="overflow-hidden">
+                      <p className="px-5 pb-5 text-sm leading-relaxed text-muted-foreground sm:px-6">{faq.a}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+          {faqs.length > INITIAL_VISIBLE && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="mx-auto mt-5 flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              {showAll ? "Show fewer questions" : `Show all ${faqs.length} questions`}
+              <ChevronDown className={cn("size-4 transition-transform", showAll && "rotate-180")} />
+            </button>
+          )}
         </div>
       </div>
     </section>

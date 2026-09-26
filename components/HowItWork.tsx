@@ -1,194 +1,181 @@
 "use client"
 
 import * as React from "react"
-import { Search, CalendarCheck, Video, CheckCircle2, Clock, Wallet, MapPin } from "lucide-react"
+import Link from "next/link"
+import { ArrowRight, CalendarCheck, CheckCircle2, Clock, MapPin, Mic, Search, Video, Wallet } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { SectionHeading } from "@/components/section-heading"
 import { cn } from "@/lib/utils"
+
+function SearchMock() {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+        <Search className="size-3.5 text-primary" />
+        Land dispute lawyer…
+      </div>
+      {["Advocate · Land law", "Legal consultant"].map((t, i) => (
+        <div key={t} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2">
+          <span className={cn("size-6 rounded-full", i === 0 ? "bg-primary/30" : "bg-amber-400/40")} />
+          <span className="h-2 flex-1 rounded-full bg-muted" />
+          <span className="text-[10px] font-medium text-muted-foreground">{t}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SlotMock() {
+  const slots = ["10:00", "11:30", "2:00", "4:30", "6:00", "7:30"]
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {slots.map((s, i) => (
+        <span
+          key={s}
+          className={cn(
+            "rounded-lg border py-2 text-center text-xs font-medium",
+            i === 4
+              ? "border-amber-500 bg-amber-500 text-amber-950 shadow-sm shadow-amber-500/30"
+              : "border-border bg-background text-muted-foreground"
+          )}
+        >
+          {s}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function VideoMock() {
+  return (
+    <div className="relative overflow-hidden rounded-lg bg-slate-900 p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex aspect-video items-center justify-center rounded-md bg-linear-to-br from-sky-500/40 to-indigo-500/40">
+          <span className="size-6 rounded-full bg-white/70" />
+        </div>
+        <div className="flex aspect-video items-center justify-center rounded-md bg-linear-to-br from-emerald-500/40 to-teal-500/40">
+          <span className="size-6 rounded-full bg-white/70" />
+        </div>
+      </div>
+      <div className="mt-2 flex justify-center gap-2">
+        <span className="flex size-6 items-center justify-center rounded-full bg-white/10 text-white">
+          <Mic className="size-3" />
+        </span>
+        <span className="flex size-6 items-center justify-center rounded-full bg-white/10 text-white">
+          <Video className="size-3" />
+        </span>
+        <span className="h-6 w-10 rounded-full bg-red-500" />
+      </div>
+    </div>
+  )
+}
 
 const steps = [
   {
-    num: 1,
-    title: "Find an Expert",
-    desc: "Browse by category or search",
+    title: "Find an expert",
+    bn: "এক্সপার্ট খুঁজুন",
+    desc: "Browse by category or search by your problem.",
     icon: Search,
-    color: "text-primary-foreground bg-primary",
-    badge: "Search",
-    badgeIcon: Search,
-    badgeClass: "text-primary",
+    accent: "bg-primary text-primary-foreground",
+    Mock: SearchMock,
   },
   {
-    num: 2,
-    title: "Book a Time Slot",
-    desc: "Pick a time that works",
+    title: "Book a time slot",
+    bn: "সময় বুক করুন",
+    desc: "Pick an open slot and pay securely online.",
     icon: CalendarCheck,
-    color: "text-amber-950 bg-amber-500",
-    badge: "Booked",
-    badgeIcon: CalendarCheck,
-    badgeClass: "text-amber-600 dark:text-amber-400",
+    accent: "bg-amber-500 text-amber-950",
+    Mock: SlotMock,
   },
   {
-    num: 3,
-    title: "Join Video Consultation",
-    desc: "Get advice in minutes",
+    title: "Join the video call",
+    bn: "ভিডিও কলে যুক্ত হন",
+    desc: "Meet privately and get clear, actionable advice.",
     icon: Video,
-    color: "text-green-950 bg-green-500",
-    isLast: true,
-    badge: "Done",
-    badgeIcon: CheckCircle2,
-    badgeClass: "text-green-600 dark:text-green-400",
+    accent: "bg-emerald-500 text-white",
+    Mock: VideoMock,
   },
 ]
 
 const benefits = [
-  { text: "Get answers in minutes", icon: Clock },
+  { text: "Answers in minutes", icon: Clock },
   { text: "Affordable expert advice", icon: Wallet },
   { text: "No travel required", icon: MapPin },
 ]
 
-function ConnectorLine({ delay = 0, vertical = false }: { delay?: number; vertical?: boolean }) {
-  const length = vertical ? 32 : 48
-  return (
-    <svg
-      className="shrink-0 text-border"
-      width={vertical ? 2 : 56}
-      height={vertical ? 32 : 2}
-      viewBox={vertical ? `0 0 2 ${length}` : `0 0 ${length} 2`}
-      fill="none"
-      aria-hidden
-    >
-      <line
-        x1={vertical ? 1 : 0}
-        y1={vertical ? 0 : 1}
-        x2={vertical ? 1 : length}
-        y2={vertical ? length : 1}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeDasharray={length}
-        strokeDashoffset={length}
-        className="animate-flow-line"
-        style={{
-          animationDelay: `${delay}ms`,
-          animationFillMode: "forwards",
-        }}
-      />
-    </svg>
-  )
-}
-
-const DOT_SIZE = 1.5
-const DOT_GAP = 24
-
-function DottedBg() {
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 -z-10 h-full w-full text-foreground opacity-[0.08] dark:opacity-[0.12]"
-      aria-hidden
-    >
-      <defs>
-        <pattern
-          id="howitwork-dots"
-          width={DOT_GAP}
-          height={DOT_GAP}
-          patternUnits="userSpaceOnUse"
-        >
-          <circle cx={DOT_GAP / 2} cy={DOT_GAP / 2} r={DOT_SIZE} fill="currentColor" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#howitwork-dots)" />
-    </svg>
-  )
-}
-
 function HowItWork() {
   return (
-    <section id="how-it-works" className="relative py-16 sm:py-20">
-      <DottedBg />
+    <section id="how-it-works" className="relative isolate overflow-hidden bg-muted/30 py-16 sm:py-20 lg:py-24">
+      <svg className="pointer-events-none absolute inset-0 -z-10 size-full text-foreground opacity-[0.06]" aria-hidden>
+        <defs>
+          <pattern id="howitwork-dots" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#howitwork-dots)" />
+      </svg>
+
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-center text-sm font-medium text-primary">
-          — Booking Journey —
-        </p>
-        <h2 className="mb-12 text-center text-2xl font-bold tracking-tight sm:text-3xl">
-          How it works
-        </h2>
+        <SectionHeading
+          align="center"
+          eyebrow="Booking journey"
+          title="Expert advice in 3 simple steps"
+          description="From search to solution — no travel, no waiting rooms."
+        />
 
-        <div >
-         
-
-          <div className="flex flex-col">
-            <div className="flex flex-col items-stretch sm:flex-row sm:items-center sm:justify-between">
-              {steps.map((step, i) => {
-                const Icon = step.icon
-                const BadgeIcon = step.badgeIcon
-                const isLast = step.isLast ?? i === steps.length - 1
-                return (
-                  <React.Fragment key={step.num}>
-                    <div
-                      className={cn(
-                        "group flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-300",
-                        "hover:border-primary/30 hover:shadow-md sm:min-w-[140px] sm:flex-1",
-                        isLast && "ring-2 ring-green-500/30 ring-offset-2 ring-offset-background"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div
-                          className={cn(
-                            "flex size-12 shrink-0 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-110",
-                            step.color
-                          )}
-                        >
-                          {isLast ? (
-                            <CheckCircle2 className="size-6 text-white" strokeWidth={2.5} />
-                          ) : (
-                            <Icon className="size-6" />
-                          )}
-                        </div>
-                        <span className="text-2xl font-bold text-muted-foreground/60">
-                          {String(step.num).padStart(2, "0")}
-                        </span>
-                      </div>
-                      <h3 className="mt-3 font-semibold text-foreground">{step.title}</h3>
-                      <p className="mt-0.5 text-sm text-muted-foreground">{step.desc}</p>
-                      {"badge" in step && (
-                        <p
-                          className={cn(
-                            "mt-2 inline-flex w-fit items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium",
-                            step.badgeClass
-                          )}
-                        >
-                          <BadgeIcon className="size-3.5 shrink-0" />
-                          {step.badge}
-                        </p>
-                      )}
-                    </div>
-                    {i < steps.length - 1 && (
-                      <div className="hidden items-center py-6 sm:flex">
-                        <ConnectorLine delay={(i + 1) * 200} />
-                      </div>
-                    )}
-                    {i < steps.length - 1 && (
-                      <div className="flex justify-center py-2 sm:hidden">
-                        <ConnectorLine delay={(i + 1) * 200} vertical />
-                      </div>
-                    )}
-                  </React.Fragment>
-                )
-              })}
-            </div>
-
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              {benefits.map(({ text, icon: BenefitIcon }) => (
-                <span
-                  key={text}
-                  className={cn(
-                    "flex items-center gap-2 rounded-full border border-border bg-muted/30 px-4 py-2 text-sm text-muted-foreground",
-                    "transition-all duration-300 hover:border-primary/30 hover:bg-primary/5 hover:text-foreground"
-                  )}
-                >
-                  <BenefitIcon className="size-4 shrink-0 text-primary" />
-                  {text}
+        <ol className="relative mt-12 grid gap-6 md:grid-cols-3">
+          <span
+            className="absolute left-[16%] right-[16%] top-7 hidden border-t-2 border-dashed border-primary/25 md:block"
+            aria-hidden
+          />
+          {steps.map(({ title, bn, desc, icon: Icon, accent, Mock }, i) => (
+            <li key={title} className="relative flex flex-col items-center text-center">
+              <span
+                className={cn(
+                  "relative z-10 flex size-14 items-center justify-center rounded-2xl shadow-lg ring-8 ring-background",
+                  accent
+                )}
+              >
+                <Icon className="size-6" />
+                <span className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background">
+                  {i + 1}
                 </span>
-              ))}
-            </div>
+              </span>
+              <div className="mt-5 flex w-full flex-1 flex-col rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div className="rounded-xl bg-muted/60 p-3">
+                  <Mock />
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-foreground">{title}</h3>
+                <p className="text-xs font-medium text-primary">{bn}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
+                {i === steps.length - 1 && (
+                  <p className="mt-3 inline-flex w-fit items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="size-3.5" />
+                    Problem solved
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-10 flex flex-col items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {benefits.map(({ text, icon: BenefitIcon }) => (
+              <span
+                key={text}
+                className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground"
+              >
+                <BenefitIcon className="size-4 shrink-0 text-primary" />
+                {text}
+              </span>
+            ))}
           </div>
+          <Button size="lg" className="rounded-full" asChild>
+            <Link href="/experts">
+              Get started <ArrowRight className="size-4" />
+            </Link>
+          </Button>
         </div>
       </div>
     </section>
